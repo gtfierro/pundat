@@ -6,8 +6,8 @@ import (
 
 type MetadataStore interface {
 	GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error)
-	GetMetadata(VK string, tags []string, where common.Dict) ([]*common.MetadataGroup, error)
-	GetDistinct(VK string, tag string, where common.Dict) ([]*common.MetadataRecord, error)
+	GetMetadata(VK string, tags []string, where common.Dict) (*common.MetadataGroup, error)
+	GetDistinct(VK string, tag string, where common.Dict) (*common.MetadataGroup, error)
 
 	SaveMetadata(VK string, records []*common.MetadataRecord) error
 
