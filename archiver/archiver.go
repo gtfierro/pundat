@@ -50,7 +50,11 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.iface = a.svc.RegisterInterface("0", "i.archiver")
 
 	// setup dot master
-	a.DM = NewDotMaster(a.bw, c.ARConfig.BlockExpiry)
+	a.DM = NewDotMaster(a.bw, c.Archiver.BlockExpiry)
+
+	// TODO: listen for queries
+
+	// TODO: create the View to listen for the archive requests
 
 	return a
 }
