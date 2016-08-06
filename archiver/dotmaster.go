@@ -1,8 +1,9 @@
 package archiver
 
 import (
+	"fmt"
 	"github.com/gtfierro/durandal/common"
-	"github.com/immesys/bw2/objects"
+	//"github.com/immesys/bw2/objects"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"time"
@@ -77,22 +78,23 @@ func (dm *DotMaster) FilterTSByVK(VK string, ts *common.Timeseries) (*common.Tim
 	)
 	for chain := range chainChan {
 		// get the DOT
-		_dot, err := objects.NewDOT(objects.ROPermissionDOT, chain.Content)
-		if err != nil {
-			return nil, errors.Wrap(err, "Could not parse ROPermissionDOT from chain contents")
-		}
-		dot, ok := _dot.(*objects.DOT)
-		if !ok {
-			return nil, errors.Wrap(err, "Could not get DOT from RoutingObject")
-		}
-		dotstart := dot.GetCreated()
-		dotend := dot.GetExpiry()
-		if dotstart.Before(start) {
-			start = *dotstart
-		}
-		if dotend.After(end) {
-			end = *dotend
-		}
+		fmt.Println(chain)
+		//_dot, err := objects.NewDOT(objects.ROPermissionDOT, chain.Content)
+		//if err != nil {
+		//	return nil, errors.Wrap(err, "Could not parse ROPermissionDOT from chain contents")
+		//}
+		//dot, ok := _dot.(*objects.DOT)
+		//if !ok {
+		//	return nil, errors.Wrap(err, "Could not get DOT from RoutingObject")
+		//}
+		//dotstart := dot.GetCreated()
+		//dotend := dot.GetExpiry()
+		//if dotstart.Before(start) {
+		//	start = *dotstart
+		//}
+		//if dotend.After(end) {
+		//	end = *dotend
+		//}
 	}
 	// now filter timeseries by the start and end
 	log.Debugf("Start: %v, End %v", start, end)
