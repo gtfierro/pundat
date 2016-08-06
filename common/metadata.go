@@ -59,10 +59,3 @@ func (grp *MetadataGroup) GetKey(key string) *MetadataRecord {
 	grp.RUnlock()
 	return rec
 }
-
-// TODO: make this a method of the metadata interface so that it can do caching
-// returns a copy of this group that only contains records for which:
-//  - a valid DOT exists from the VK to the record
-//  - the metadata record is valid w/n the valid time window of the DOT
-//func (grp *MetadataGroup) FilterByVK(vk string) *MetadataGroup {
-//}
