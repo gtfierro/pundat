@@ -8,6 +8,7 @@ type BWConfig struct {
 	Address    string
 	Entityfile string
 	Namespace  string
+	DeployNS   string
 	ListenNS   []string
 }
 

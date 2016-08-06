@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"github.com/gtfierro/durandal/common"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
@@ -28,11 +29,17 @@ type Archiver struct {
 	DM        *DotMaster
 	svc       *bw2.Service
 	iface     *bw2.Interface
+	vm        *viewManager
 	namespace string
+	config    *Config
+	stop      chan bool
 }
 
 func NewArchiver(c *Config) (a *Archiver) {
-	a = &Archiver{}
+	a = &Archiver{
+		config: c,
+		stop:   make(chan bool),
+	}
 
 	// setup metadata
 	mongoaddr, err := net.ResolveTCPAddr("tcp4", c.Metadata.Address)
@@ -52,9 +59,37 @@ func NewArchiver(c *Config) (a *Archiver) {
 	// setup dot master
 	a.DM = NewDotMaster(a.bw, c.Archiver.BlockExpiry)
 
+	// setup view manager
+	a.vm = newViewManager(a.bw)
+
 	// TODO: listen for queries
 
 	// TODO: create the View to listen for the archive requests
+	a.svc = a.bw.RegisterService(c.BOSSWAVE.DeployNS, "s.giles")
+	a.iface = a.svc.RegisterInterface("_", "i.archiver")
+	queryChan, err := a.bw.Subscribe(&bw2.SubscribeParams{
+		URI: a.iface.SlotURI("query"),
+	})
+	if err != nil {
+		log.Error(errors.Wrap(err, "Could not subscribe"))
+	}
+	log.Noticef("Listening on %s", a.iface.SlotURI("query"))
+	log.Noticef("Listening on %s", a.iface.SlotURI("subscribe"))
+	common.NewWorkerPool(queryChan, a.listenQueries, 1000).Start()
 
 	return a
+}
+
+func (a *Archiver) Serve() {
+	for _, namespace := range a.config.BOSSWAVE.ListenNS {
+		a.vm.subscribeNamespace(namespace)
+	}
+	<-a.stop
+}
+
+func (a *Archiver) Stop() {
+	a.stop <- true
+}
+
+func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 }
