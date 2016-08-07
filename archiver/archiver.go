@@ -60,7 +60,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.DM = NewDotMaster(a.bw, c.Archiver.BlockExpiry)
 
 	// setup view manager
-	a.vm = newViewManager(a.bw)
+	a.vm = newViewManager(a.bw, a.MD)
 
 	// TODO: listen for queries
 

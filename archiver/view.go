@@ -15,6 +15,7 @@ import (
 // takes care of handling/parsing archive requests
 type viewManager struct {
 	client *bw2.BW2Client
+	store  MetadataStore
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
 	requestHosts     *SynchronizedArchiveRequestMap
@@ -22,9 +23,10 @@ type viewManager struct {
 	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client) *viewManager {
+func newViewManager(client *bw2.BW2Client, store MetadataStore) *viewManager {
 	return &viewManager{
 		client:           client,
+		store:            store,
 		namespaceAliases: make(map[string]string),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
 		requestURIs:      NewSynchronizedArchiveRequestMap(),
@@ -146,7 +148,7 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	if request.MetadataExpr != "" {
 		request.metadataExpr = ob.Parse(request.MetadataExpr)
 	}
-	var ret = common.NewMetadataGroup()
+	var newMetadata = common.NewMetadataGroup()
 	if request.InheritMetadata {
 		md, from, err := vm.client.GetMetadata(request.URI)
 		if err != nil {
@@ -168,10 +170,11 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 			} else {
 				rec.SrcURI = request.URI
 			}
-			ret.AddRecord(rec)
+			newMetadata.AddRecord(rec)
 		}
-		ret.UUID = request.uuidActual
+		newMetadata.UUID = request.uuidActual
 		//TODO: save metadata or queue it to be saved
+		//TODO: this should be a subscription as well
 	}
 	if len(request.MetadataURIs) > 0 {
 		// need to query/subscribe for each of these
@@ -191,6 +194,8 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 				return errors.Wrap(err, "Could not subscribe")
 			}
 			go func(a chan *bw2.SimpleMessage) {
+				// create new metadata group
+				// create a timer (maybe a global timer?)
 				for {
 					select {
 					case msg := <-a:
@@ -208,6 +213,9 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	}
 	// by now, we've accumulated the initial set of metadata available to be associated
 	// with this stream, so we save it to the metadata database
+	if err := vm.store.SaveMetadata("dummy not a real key", newMetadata); err != nil {
+		return err
+	}
 
 	// we now subscribe to the actual URI indicated by the archiverequest
 	// we want to make sure that we don't subscribe more than necessary:

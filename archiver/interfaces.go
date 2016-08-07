@@ -9,7 +9,7 @@ type MetadataStore interface {
 	GetMetadata(VK string, tags []string, where common.Dict) (*common.MetadataGroup, error)
 	GetDistinct(VK string, tag string, where common.Dict) (*common.MetadataGroup, error)
 
-	SaveMetadata(VK string, records []*common.MetadataRecord) error
+	SaveMetadata(VK string, records *common.MetadataGroup) error
 
 	RemoveMetadata(VK string, tags []string, where common.Dict) error
 }
