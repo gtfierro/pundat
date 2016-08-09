@@ -216,3 +216,13 @@ func convertTime(time uint64, stream_uot, target_uot UnitOfTime) (uint64, error)
 	}
 	return returnTime, nil
 }
+
+// given a URI of form "/a/b/c/!meta/key", returns key
+// note: does not require "meta"
+func getURIKey(uri string) string {
+	li := strings.LastIndex(uri, "/")
+	if li > 0 {
+		return uri[li+1:]
+	}
+	return uri
+}
