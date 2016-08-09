@@ -4,12 +4,35 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/gtfierro/durandal/archiver"
+	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"os"
+	"runtime"
+	"time"
 )
+
+// logger
+var log *logging.Logger
+
+func init() {
+	log = logging.MustGetLogger("durandal")
+	var format = "%{color}%{level} %{time:Jan 02 15:04:05} %{color:reset} ▶ %{message}"
+	var logBackend = logging.NewLogBackend(os.Stderr, "", 0)
+	logBackendLeveled := logging.AddModuleLevel(logBackend)
+	logging.SetBackend(logBackendLeveled)
+	logging.SetFormatter(logging.MustStringFormatter(format))
+}
 
 func startArchiver(c *cli.Context) error {
 	config := archiver.LoadConfig(c.String("config"))
+	if config.Archiver.PeriodicReport {
+		go func() {
+			for {
+				time.Sleep(5 * time.Second)
+				log.Infof("Number of active goroutines %v", runtime.NumGoroutine())
+			}
+		}()
+	}
 	a := archiver.NewArchiver(config)
 	a.Serve()
 	return nil
