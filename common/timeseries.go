@@ -23,14 +23,38 @@ func (s *TimeseriesReading) DecodeMsgpack(enc *msgpack.Decoder) error {
 	return enc.Decode(&s.Time, &s.Value)
 }
 
+type StatisticsReading struct {
+	// uint64 timestamp
+	Time  time.Time
+	Count uint64
+	Min   float64
+	Mean  float64
+	Max   float64
+}
+
 type Timeseries struct {
 	sync.RWMutex
 	Records    []*TimeseriesReading
 	Generation int64
 	SrcURI     string
+	UUID       UUID
 }
 
 func (ts *Timeseries) AddRecord(rec *TimeseriesReading) {
+	ts.Lock()
+	ts.Records = append(ts.Records, rec)
+	ts.Unlock()
+}
+
+type StatisticTimeseries struct {
+	sync.RWMutex
+	Records    []*StatisticsReading
+	Generation int64
+	SrcURI     string
+	UUID       UUID
+}
+
+func (ts *StatisticTimeseries) AddRecord(rec *StatisticsReading) {
 	ts.Lock()
 	ts.Records = append(ts.Records, rec)
 	ts.Unlock()

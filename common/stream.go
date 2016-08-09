@@ -6,6 +6,10 @@ import (
 
 type UUID uuid.UUID
 
+func ParseUUID(s string) UUID {
+	return UUID(uuid.Parse(s))
+}
+
 type Stream struct {
 	URI        string
 	UUID       UUID
