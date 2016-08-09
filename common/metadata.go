@@ -1,6 +1,7 @@
 package common
 
 import (
+	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"sync"
 	"time"
 )
@@ -12,6 +13,20 @@ type MetadataRecord struct {
 	Value     interface{}
 	SrcURI    string
 	TimeValid time.Time
+}
+
+func RecordFromMessage(msg *bw2.SimpleMessage) *MetadataRecord {
+	po := msg.GetOnePODF(bw2.PODFSMetadata)
+	if _md, ok := po.(bw2.MetadataPayloadObject); ok {
+		md := _md.Value()
+		return &MetadataRecord{
+			Key:       getURIKey(msg.URI),
+			Value:     md.Value,
+			SrcURI:    msg.URI,
+			TimeValid: time.Unix(0, md.Timestamp),
+		}
+	}
+	return nil
 }
 
 type MetadataGroup struct {
@@ -28,6 +43,31 @@ func NewMetadataGroup(records ...*MetadataRecord) *MetadataGroup {
 	}
 	for _, record := range records {
 		grp.Records[record.Key] = record
+	}
+	return grp
+}
+
+func NewEmptyMetadataGroup() *MetadataGroup {
+	return &MetadataGroup{
+		Records: make(map[string]*MetadataRecord),
+	}
+}
+
+func GroupFromMessage(msg *bw2.SimpleMessage) *MetadataGroup {
+	var grp = NewEmptyMetadataGroup()
+	for _, po := range msg.POs {
+		if po.IsTypeDF(bw2.PODFSMetadata) {
+			if _md, ok := po.(bw2.MetadataPayloadObject); ok {
+				md := _md.Value()
+				rec := &MetadataRecord{
+					Key:       getURIKey(msg.URI),
+					Value:     md.Value,
+					SrcURI:    msg.URI,
+					TimeValid: time.Unix(0, md.Timestamp),
+				}
+				grp.AddRecord(rec)
+			}
+		}
 	}
 	return grp
 }
@@ -58,4 +98,15 @@ func (grp *MetadataGroup) GetKey(key string) *MetadataRecord {
 	rec := grp.Records[key]
 	grp.RUnlock()
 	return rec
+}
+
+func (grp *MetadataGroup) Merge(g2 *MetadataGroup) {
+	g2.RLock()
+	grp.Lock()
+	defer g2.RUnlock()
+	defer grp.Unlock()
+
+	for _, rec := range g2.Records {
+		grp.AddRecord(rec)
+	}
 }
