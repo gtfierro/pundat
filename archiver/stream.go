@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"github.com/gtfierro/durandal/common"
 	ob "github.com/gtfierro/giles2/objectbuilder"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
@@ -9,7 +10,7 @@ import (
 
 type Stream struct {
 	// timeseries identifier
-	UUID     string
+	UUID     common.UUID
 	uuidExpr []ob.Operation
 	// immutable source of the stream. What the Archive Request points to.
 	// This is what we subscribe to for data to archive (but not metadata)
@@ -37,7 +38,12 @@ func (s *Stream) URI() string {
 }
 
 //TODO: database reference goes here
-func (s *Stream) startArchiving() {
+func (s *Stream) startArchiving(store TimeseriesStore) {
+	ts := common.Timeseries{
+		UUID:   s.UUID,
+		SrcURI: s.uri,
+	}
+	//TODO: batching
 	go func() {
 		for msg := range s.subscription {
 			for _, po := range msg.POs {
@@ -52,28 +58,32 @@ func (s *Stream) startArchiving() {
 				}
 				value := ob.Eval(s.valueExpr, thing)
 				time := s.getTime(thing)
-				if s.UUID == "" {
-					s.UUID = ob.Eval(s.uuidExpr, thing).(string)
+				if len(s.UUID) == 0 {
+					s.UUID = ob.Eval(s.uuidExpr, thing).(common.UUID)
 				}
 				log.Noticef("UUID: %v, Value: %v, time %v", s.UUID, value, time)
+				ts.Records = []*common.TimeseriesReading{{Time: time, Value: value.(float64)}}
+				if err := store.AddReadings(ts); err != nil {
+					log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
+				}
 			}
 		}
 	}()
 }
 
-func (s *Stream) getTime(thing interface{}) uint64 {
+func (s *Stream) getTime(thing interface{}) time.Time {
 	if len(s.timeExpr) == 0 {
-		return uint64(time.Now().UnixNano())
+		return time.Now()
 	}
 	timeString, ok := ob.Eval(s.timeExpr, thing).(string)
 	if ok {
 		parsedTime, err := time.Parse(s.timeParse, timeString)
 		if err != nil {
-			return uint64(time.Now().UnixNano())
+			return time.Now()
 		}
-		return uint64(parsedTime.UnixNano())
+		return parsedTime
 	}
-	return uint64(time.Now().UnixNano())
+	return time.Now()
 }
 
 /*

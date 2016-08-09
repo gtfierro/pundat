@@ -21,10 +21,15 @@ type MDConfig struct {
 	Address string
 }
 
+type BTRDBConfig struct {
+	Address string
+}
+
 type Config struct {
 	Archiver ARConfig
 	BOSSWAVE BWConfig
 	Metadata MDConfig
+	BtrDB    BTRDBConfig
 }
 
 func LoadConfig(filename string) *Config {

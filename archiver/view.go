@@ -16,6 +16,7 @@ import (
 type viewManager struct {
 	client *bw2.BW2Client
 	store  MetadataStore
+	ts     TimeseriesStore
 	subber *metadatasubscriber
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
@@ -24,10 +25,11 @@ type viewManager struct {
 	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client, store MetadataStore, subber *metadatasubscriber) *viewManager {
+func newViewManager(client *bw2.BW2Client, store MetadataStore, ts TimeseriesStore, subber *metadatasubscriber) *viewManager {
 	return &viewManager{
 		client:           client,
 		store:            store,
+		ts:               ts,
 		subber:           subber,
 		namespaceAliases: make(map[string]string),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
@@ -144,7 +146,7 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	stream.valueExpr = ob.Parse(request.Value)
 
 	if request.UUID == "" {
-		stream.UUID = uuid.NewV3(NAMESPACE_UUID, request.URI+string(request.PO)+request.Value).String()
+		stream.UUID = common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, request.URI+string(request.PO)+request.Value).String())
 	} else {
 		stream.uuidExpr = ob.Parse(request.UUID)
 	}
@@ -179,10 +181,14 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 		vm.subber.requestSubscription(muri)
 	}
 
+	// indicate that we've gotten an archive request
 	request.Dump()
 
+	if err := vm.store.MapURItoUUID(stream.uri, stream.UUID); err != nil {
+		return err
+	}
 	// now, we save the stream
-	stream.startArchiving()
+	stream.startArchiving(vm.ts)
 
 	return nil
 }

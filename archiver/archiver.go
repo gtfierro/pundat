@@ -26,6 +26,7 @@ type Archiver struct {
 	bw        *bw2.BW2Client
 	vk        string
 	MD        MetadataStore
+	TS        TimeseriesStore
 	DM        *DotMaster
 	svc       *bw2.Service
 	iface     *bw2.Interface
@@ -49,6 +50,12 @@ func NewArchiver(c *Config) (a *Archiver) {
 	}
 	a.MD = newMongoStore(&mongoConfig{address: mongoaddr})
 
+	btrdbaddr, err := net.ResolveTCPAddr("tcp4", c.BtrDB.Address)
+	if err != nil {
+		log.Fatal(errors.Wrapf(err, "Could not resolve BtrDB address %s", c.BtrDB.Address))
+	}
+	a.TS = newBtrIface(&btrdbConfig{address: btrdbaddr})
+
 	// setup bosswave
 	a.namespace = c.BOSSWAVE.Namespace
 	a.bw = bw2.ConnectOrExit(c.BOSSWAVE.Address)
@@ -63,7 +70,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.ms = newMetadataSubscriber(a.bw, a.MD)
 
 	// setup view manager
-	a.vm = newViewManager(a.bw, a.MD, a.ms)
+	a.vm = newViewManager(a.bw, a.MD, a.TS, a.ms)
 
 	// TODO: listen for queries
 
