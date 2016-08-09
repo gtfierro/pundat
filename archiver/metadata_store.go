@@ -3,10 +3,12 @@ package archiver
 import (
 	"fmt"
 	"github.com/gtfierro/durandal/common"
+	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"net"
+	"time"
 )
 
 type mongoConfig struct {
@@ -14,9 +16,12 @@ type mongoConfig struct {
 }
 
 type mongoStore struct {
-	session  *mgo.Session
-	db       *mgo.Database
-	metadata *mgo.Collection
+	session      *mgo.Session
+	db           *mgo.Database
+	metadata     *mgo.Collection
+	streams      *mgo.Collection
+	mapping      *mgo.Collection
+	uriUUIDCache *ccache.Cache
 }
 
 func newMongoStore(c *mongoConfig) *mongoStore {
@@ -32,9 +37,13 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 	// fetch/create collections and db reference
 	m.db = m.session.DB("durandal")
 	m.metadata = m.db.C("metadata")
+	m.streams = m.db.C("streams")
+	m.mapping = m.db.C("mapping")
 
 	// add indexes. This will fail Fatal
 	m.addIndexes()
+
+	m.uriUUIDCache = ccache.New(ccache.Configure().MaxSize(10000))
 
 	return m
 }
@@ -73,6 +82,14 @@ func (m *mongoStore) addIndexes() {
 	err = m.metadata.EnsureIndex(index)
 	if err != nil {
 		log.Fatalf("Could not create index on metadata.Key (%v)", err)
+	}
+
+	// mapping indexes
+	index.Key = []string{"UUID"}
+	index.Unique = true
+	err = m.mapping.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on mapping.UUID (%v)", err)
 	}
 
 }
@@ -188,4 +205,28 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 
 func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict) error {
 	return nil
+}
+
+func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
+	err := m.mapping.Insert(bson.M{"URI": uri, "UUID": uuid})
+	m.uriUUIDCache.Set(uri, uuid, time.Minute*10)
+	if mgo.IsDup(err) {
+		return nil
+	}
+	return err
+}
+
+func (m *mongoStore) URItoUUID(uri string) (common.UUID, error) {
+	item, err := m.uriUUIDCache.Fetch(uri, time.Minute*10, func() (interface{}, error) {
+		var (
+			uuid common.UUID
+		)
+		err := m.mapping.Find(bson.M{"URI": uri}).Select(bson.M{"uuid": 1}).One(&uuid)
+		if err != nil {
+			return nil, nil
+		}
+		return uuid, nil
+	})
+	item.Extend(10 * time.Minute)
+	return item.Value().(common.UUID), err
 }
