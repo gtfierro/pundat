@@ -105,3 +105,14 @@ func (dm *DotMaster) FilterTSByVK(VK string, ts *common.Timeseries) (*common.Tim
 	}
 	return ret, nil
 }
+
+/*
+How does this work?
+
+buildchain gives a list of simplechains
+
+for each of those, the contents should be a byte array of length that is a multiple of 32.
+Each of those 32 bytes is a dot hash. That can be converted to a base64 string (this is immutable and can be cached)
+This is passed to resolve registry to get routing objects and their validity.
+That routing object (RO) can be converted to a DOT (I think this is an interface), and then we can pull expiry from the DOT
+*/

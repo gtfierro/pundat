@@ -30,6 +30,7 @@ type Archiver struct {
 	svc       *bw2.Service
 	iface     *bw2.Interface
 	vm        *viewManager
+	ms        *metadatasubscriber
 	namespace string
 	config    *Config
 	stop      chan bool
@@ -59,8 +60,10 @@ func NewArchiver(c *Config) (a *Archiver) {
 	// setup dot master
 	a.DM = NewDotMaster(a.bw, c.Archiver.BlockExpiry)
 
+	a.ms = newMetadataSubscriber(a.bw, a.MD)
+
 	// setup view manager
-	a.vm = newViewManager(a.bw, a.MD)
+	a.vm = newViewManager(a.bw, a.MD, a.ms)
 
 	// TODO: listen for queries
 

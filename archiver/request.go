@@ -3,11 +3,9 @@ package archiver
 import (
 	"fmt"
 	"github.com/gtfierro/durandal/common"
-	ob "github.com/gtfierro/giles2/objectbuilder"
 	"github.com/satori/go.uuid"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"sync"
-	"time"
 )
 
 var NAMESPACE_UUID = uuid.FromStringOrNil("b26d2e62-333e-11e6-b557-0cc47a0f7eea")
@@ -35,16 +33,16 @@ type ArchiveRequest struct {
 	UUID string
 	// the real UUID when we get it
 	uuidActual common.UUID
-	uuid       []ob.Operation
+	//uuid       []ob.Operation
 	// expression determining how to extract the value from the received
 	// message
 	Value string
-	value []ob.Operation
+	//value []ob.Operation
 	// OPTIONAL. Expression determining how to extract the value from the
 	// received message. If not included, it uses the time the message was
 	// received on the server.
 	Time string
-	time []ob.Operation
+	//time []ob.Operation
 	// OPTIONAL. Golang time parse string
 	TimeParse string
 
@@ -62,10 +60,10 @@ type ArchiveRequest struct {
 	// OPTIONAL. a ObjectBuilder expression to search in the current message
 	// for metadata
 	MetadataExpr string
-	metadataExpr []ob.Operation
+	//metadataExpr []ob.Operation
 
 	// to cancel an archive request, send on this channel
-	cancel chan bool
+	//cancel chan bool
 }
 
 // Print the parameters
@@ -114,21 +112,21 @@ func (req *ArchiveRequest) Hash() string {
 	return req.URI + bw2.PONumDotForm(req.PO) + req.UUID + req.Value
 }
 
-func (req *ArchiveRequest) getTime(thing interface{}) uint64 {
-	if len(req.time) == 0 {
-		return uint64(time.Now().UnixNano())
-	}
-	timeString, ok := ob.Eval(req.time, thing).(string)
-	if ok {
-		parsedTime, err := time.Parse(req.TimeParse, timeString)
-		if err != nil {
-			return uint64(time.Now().UnixNano())
-		}
-		return uint64(parsedTime.UnixNano())
-	}
-	return uint64(time.Now().UnixNano())
-}
-
+//func (req *ArchiveRequest) getTime(thing interface{}) uint64 {
+//	if len(req.time) == 0 {
+//		return uint64(time.Now().UnixNano())
+//	}
+//	timeString, ok := ob.Eval(req.time, thing).(string)
+//	if ok {
+//		parsedTime, err := time.Parse(req.TimeParse, timeString)
+//		if err != nil {
+//			return uint64(time.Now().UnixNano())
+//		}
+//		return uint64(parsedTime.UnixNano())
+//	}
+//	return uint64(time.Now().UnixNano())
+//}
+//
 // Returns true if the two ArchiveRequests are equal
 func (req *ArchiveRequest) Equals(other *ArchiveRequest) bool {
 	return (req != nil && other != nil) &&

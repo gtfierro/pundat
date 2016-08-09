@@ -9,13 +9,14 @@ import (
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"reflect"
 	"strings"
-	"time"
+	//	"time"
 )
 
 // takes care of handling/parsing archive requests
 type viewManager struct {
 	client *bw2.BW2Client
 	store  MetadataStore
+	subber *metadatasubscriber
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
 	requestHosts     *SynchronizedArchiveRequestMap
@@ -23,10 +24,11 @@ type viewManager struct {
 	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client, store MetadataStore) *viewManager {
+func newViewManager(client *bw2.BW2Client, store MetadataStore, subber *metadatasubscriber) *viewManager {
 	return &viewManager{
 		client:           client,
 		store:            store,
+		subber:           subber,
 		namespaceAliases: make(map[string]string),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
 		requestURIs:      NewSynchronizedArchiveRequestMap(),
@@ -82,7 +84,6 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 				continue
 			}
 			var request = new(ArchiveRequest)
-			request.cancel = make(chan bool)
 			err := po.(bw2.MsgPackPayloadObject).ValueInto(request)
 			if err != nil {
 				log.Error(errors.Wrap(err, "Could not parse Archive Request"))
@@ -115,6 +116,7 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 		}
 	}, 1000).Start()
 
+	// handle archive requests that have already existed
 	query, err := vm.client.Query(&bw2.QueryParams{
 		URI: namespace,
 	})
@@ -133,102 +135,54 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	if request.FromVK == "" {
 		return errors.New("VK was empty in ArchiveRequest")
 	}
-	request.value = ob.Parse(request.Value)
+
+	stream := &Stream{
+		uri:    request.URI,
+		cancel: make(chan bool),
+	}
+
+	stream.valueExpr = ob.Parse(request.Value)
 
 	if request.UUID == "" {
-		request.UUID = uuid.NewV3(NAMESPACE_UUID, request.URI+string(request.PO)+request.Value).String()
+		stream.UUID = uuid.NewV3(NAMESPACE_UUID, request.URI+string(request.PO)+request.Value).String()
 	} else {
-		request.uuid = ob.Parse(request.UUID)
+		stream.uuidExpr = ob.Parse(request.UUID)
 	}
 
 	if request.Time != "" {
-		request.time = ob.Parse(request.Time)
+		stream.timeExpr = ob.Parse(request.Time)
 	}
 
-	if request.MetadataExpr != "" {
-		request.metadataExpr = ob.Parse(request.MetadataExpr)
-	}
-	var newMetadata = common.NewMetadataGroup()
+	//TODO: do we really need this?
+	//if request.MetadataExpr != "" {
+	//	stream.metadataExpr = ob.Parse(request.MetadataExpr)
+	//}
+
 	if request.InheritMetadata {
-		md, from, err := vm.client.GetMetadata(request.URI)
-		if err != nil {
-			return err
-		}
-		if len(request.UUID) == 0 && len(request.uuidActual) == 0 {
-			request.uuidActual = common.UUID(request.UUID)
-		}
-		for k, v := range md {
-			rec := &common.MetadataRecord{
-				Key:   k,
-				Value: v.Value,
-				//TODO: check if metadatatuple timestamps are
-				// nanoseconds or seconds
-				TimeValid: time.Unix(0, v.Timestamp),
-			}
-			if srcURI, found := from[k]; found {
-				rec.SrcURI = srcURI
-			} else {
-				rec.SrcURI = request.URI
-			}
-			newMetadata.AddRecord(rec)
-		}
-		newMetadata.UUID = request.uuidActual
-		//TODO: save metadata or queue it to be saved
-		//TODO: this should be a subscription as well
-	}
-	if len(request.MetadataURIs) > 0 {
-		// need to query/subscribe for each of these
-		// need to be able to cancel the subscription and
-		// reclaim the goroutines if we stop archiving this
-		// TODO: do this only once per archive URI
-		for _, metadataURI := range request.MetadataURIs {
-			uri := strings.TrimSuffix(metadataURI, "/") + "/!meta/+"
-			mdSub, err := vm.muxer.AddSubscription(uri)
-			if err != nil {
-				return errors.Wrap(err, "Could not subscribe")
-			}
-			mdQuery, err := vm.client.Query(&bw2.QueryParams{
-				URI: uri,
-			})
-			if err != nil {
-				return errors.Wrap(err, "Could not subscribe")
-			}
-			go func(a chan *bw2.SimpleMessage) {
-				// create new metadata group
-				// create a timer (maybe a global timer?)
-				for {
-					select {
-					case msg := <-a:
-						msg.Dump()
-					case <-request.cancel:
-						log.Warning("Canceling request")
-						close(a)
-					}
-				}
-			}(mdSub)
-			for msg := range mdQuery {
-				mdSub <- msg
-			}
+		for _, uri := range GetURIPrefixes(request.URI) {
+			stream.metadata = append(stream.metadata, uri+"/!meta/+")
 		}
 	}
-	// by now, we've accumulated the initial set of metadata available to be associated
-	// with this stream, so we save it to the metadata database
-	if err := vm.store.SaveMetadata("dummy not a real key", newMetadata); err != nil {
-		return err
+	for _, uri := range request.MetadataURIs {
+		stream.metadata = append(stream.metadata, uri+"/!meta/+")
 	}
 
-	// we now subscribe to the actual URI indicated by the archiverequest
-	// we want to make sure that we don't subscribe more than necessary:
-	// need a data structure that maps a URI (ending in "!meta/giles") to a set of
-	// archive requests published on that URI AND a data structure that maps
-	// the archive URI to the list of its archive requests
+	sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
+		URI: stream.uri,
+	})
+	if err != nil {
+		return errors.Wrapf(err, "Could not subscribe to %s", stream.uri)
+	}
+	stream.subscription = sub
 
-	/*
-	   What's the API we need?
-	   AddArchiveRequest(hostURI, archiveURI string, req *ArchiveRequest)
-	   RemoveArchiveRequests(hostURI)
-	   StopArchiving(archiveURI)
-	*/
+	for _, muri := range stream.metadata {
+		vm.subber.requestSubscription(muri)
+	}
+
+	request.Dump()
+
+	// now, we save the stream
+	stream.startArchiving()
 
 	return nil
 }
@@ -264,7 +218,7 @@ func (vm *viewManager) RemoveArchiveRequests(hostURI string) {
 		return
 	}
 	for _, request := range *requests {
-		request.cancel <- true
+		//request.cancel <- true
 		vm.requestHosts.Del(hostURI)
 		vm.requestURIs.RemoveEntry(request.URI, request)
 	}

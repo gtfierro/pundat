@@ -141,23 +141,50 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) (*
 }
 
 func (m *mongoStore) GetDistinct(VK string, tag string, where common.Dict) (*common.MetadataGroup, error) {
+	//var (
+	//	whereClause bson.M
+	//	distincts   []string
+	//)
+	//if len(where) != 0 {
+	//	whereClause = where.ToBSON()
+	//}
+	//err := m.metadata.Find(whereClause).Distinct(tag, &distincts)
 	return nil, nil
 }
 
-func (m *mongoStore) SaveMetadata(VK string, records *common.MetadataGroup) error {
-	records.RLock()
-	if len(records.Records) == 0 {
+func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
+	if len(records) == 0 {
+		log.Infof("Aborting metadata insert with 0 records")
 		return nil
 	}
-	for _, rec := range records.Records {
+	for _, rec := range records {
 		log.Debugf("Inserting %+v", rec)
 		if _, err := m.metadata.Upsert(bson.M{"Key": rec.Key, "SrcURI": rec.SrcURI}, rec); err != nil {
 			return err
 		}
 	}
-	defer records.RUnlock()
 	return nil
 }
+
+//func (m *mongoStore) FlushMetadataGroup(grp *common.MetadataGroup) error {
+//	grp.Lock()
+//	defer grp.Unlock()
+//	if len(grp.Records) == 0 {
+//		log.Infof("Aborting metadata insert with 0 records")
+//		return nil
+//	}
+//	for _, rec := range grp.Records {
+//		log.Debugf("Inserting %+v", rec)
+//		if _, err := m.metadata.Upsert(bson.M{"Key": rec.Key, "SrcURI": rec.SrcURI}, rec); err != nil {
+//			return err
+//		}
+//	}
+//	for k, _ := range grp.Records {
+//		delete(grp.Records, k)
+//	}
+//
+//	return nil
+//}
 
 func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict) error {
 	return nil
