@@ -3,6 +3,7 @@ package archiver
 import (
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
+	"strings"
 	"sync"
 )
 
@@ -144,7 +145,7 @@ func (ns *SubscriberMultiplexer) AddSubscription(uri string) (chan *bw2.SimpleMe
 		ns.subs[uri] = []chan *bw2.SimpleMessage{}
 		ns.Unlock()
 	}
-	ret := make(chan *bw2.SimpleMessage)
+	ret := make(chan *bw2.SimpleMessage, 10)
 	ns.Lock()
 	ns.subs[uri] = append(ns.subs[uri], ret)
 	ns.Unlock()
@@ -158,6 +159,14 @@ func (ns *SubscriberMultiplexer) handleSubscription(uri string, sub chan *bw2.Si
 			sublist := ns.subs[uri]
 			ns.RUnlock()
 			for i, c := range sublist {
+				if c == nil {
+					sublist = append(sublist[:i], sublist[i+1:]...)
+					ns.Lock()
+					ns.subs[uri] = sublist
+					ns.Unlock()
+					continue
+				}
+				// if we cannot write to a channel, it may be closed
 				select {
 				case c <- msg:
 				default:
@@ -172,7 +181,25 @@ func (ns *SubscriberMultiplexer) handleSubscription(uri string, sub chan *bw2.Si
 	}()
 }
 
-/*
-What's the API for this?
-AddSubscription(uri string) chan simplemsg
-*/
+// Given a URI /a/b/c, returns all of the prefixes /a, /a/b, /a/b/c.
+// If a metadata tag is in the URI, it does not follow past it, e.g.
+// /a/b/!meta/tag -> /a, /a/b
+func GetURIPrefixes(uri string) []string {
+	var (
+		prefixes  []string
+		start     = 1
+		lastFound = 0
+	)
+	for lastFound >= 0 {
+		if uri[start:] == "!" {
+			break
+		}
+		lastFound = strings.Index(uri[start:], "/")
+		if lastFound < 0 {
+			break
+		}
+		prefixes = append(prefixes, uri[:start+lastFound])
+		start = start + lastFound + 1
+	}
+	return prefixes
+}
