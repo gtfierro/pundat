@@ -60,6 +60,9 @@ func makeConfig(c *cli.Context) error {
 	fmt.Fprintln(f, "")
 	fmt.Fprintln(f, "[Metadata]")
 	fmt.Fprintln(f, "Address = 0.0.0.0:27017")
+	fmt.Fprintln(f, "")
+	fmt.Fprintln(f, "[BtrDB]")
+	fmt.Fprintln(f, "Address = 0.0.0.0:4410")
 	return f.Sync()
 }
 
