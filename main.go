@@ -99,17 +99,27 @@ func main() {
 }
 
 /*
+NOTES:
+- query language parsing has been ported over
+- first challenge is to get metadata queries working
+Questions:
+1. Do we save the whole timeseries of metadata records?
+    - if we only associate the most recent metadata record w/ a timeseries,
+      then someone who *could* query in the past might not be able to if the md tag
+      is deleted, but they may have lost permission before the tag was deleted. Now,
+      they know that the tag no longer applies to the stream.
+    - the solution here is likely to have the full record of all metadata values,
+      then build a DOT to ALL of them and filter the list of the most recent unique
+      (key, srcuri) pairs. this is the "view" of metadata as they are allowed to see it
+    - TODO: really want to create some sort of model or formalism or notes of how
+      metadata and permissions and time all play together. What are all the edge cases of
+      this? We want to plan for those
+
 TODO:
-- get something working:
-    - save metadata from messages
-    - set up the actual subscription
 - finish implementing metadata store:
     - involves BASIC benchmarks
     - implement the DOT stuff
     - test the DOT stuff
-- port over the timeseries stuff
 - port over the archiver query interface:
-    - the language:
-        - fix the "keys" so that they are all /-delimited and not . or |
     - the archiver API used by the language
 */
