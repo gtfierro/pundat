@@ -1,0 +1,1137 @@
+
+state 0
+	$accept: .query $end 
+
+	SELECT  shift 2
+	DELETE  shift 3
+	.  error
+
+	query  goto 1
+
+state 1
+	$accept:  query.$end 
+
+	$end  accept
+	.  error
+
+
+state 2
+	query:  SELECT.selector whereClause SEMICOLON 
+	query:  SELECT.selector SEMICOLON 
+	query:  SELECT.dataClause whereClause SEMICOLON 
+
+	DISTINCT  shift 8
+	STATISTICAL  shift 10
+	WINDOW  shift 12
+	STATISTICS  shift 11
+	DATA  shift 9
+	LVALUE  shift 14
+	ALL  shift 7
+	.  error
+
+	selector  goto 4
+	tagList  goto 6
+	dataClause  goto 5
+	lvalue  goto 13
+
+state 3
+	query:  DELETE.dataClause whereClause SEMICOLON 
+	query:  DELETE.whereClause SEMICOLON 
+
+	STATISTICAL  shift 10
+	WINDOW  shift 12
+	STATISTICS  shift 11
+	WHERE  shift 17
+	DATA  shift 9
+	.  error
+
+	whereClause  goto 16
+	dataClause  goto 15
+
+state 4
+	query:  SELECT selector.whereClause SEMICOLON 
+	query:  SELECT selector.SEMICOLON 
+
+	WHERE  shift 17
+	SEMICOLON  shift 19
+	.  error
+
+	whereClause  goto 18
+
+state 5
+	query:  SELECT dataClause.whereClause SEMICOLON 
+
+	WHERE  shift 17
+	.  error
+
+	whereClause  goto 20
+
+state 6
+	selector:  tagList.    (11)
+
+	.  reduce 11 (src line 114)
+
+
+state 7
+	selector:  ALL.    (12)
+
+	.  reduce 12 (src line 119)
+
+
+state 8
+	selector:  DISTINCT.lvalue 
+	selector:  DISTINCT.    (14)
+
+	LVALUE  shift 14
+	.  reduce 14 (src line 128)
+
+	lvalue  goto 21
+
+state 9
+	dataClause:  DATA.IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+	dataClause:  DATA.IN timeref COMMA timeref limit timeconv 
+	dataClause:  DATA.BEFORE timeref limit timeconv 
+	dataClause:  DATA.AFTER timeref limit timeconv 
+
+	BEFORE  shift 23
+	AFTER  shift 24
+	IN  shift 22
+	.  error
+
+
+state 10
+	dataClause:  STATISTICAL.LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	LPAREN  shift 25
+	.  error
+
+
+state 11
+	dataClause:  STATISTICS.LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	LPAREN  shift 26
+	.  error
+
+
+state 12
+	dataClause:  WINDOW.LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	LPAREN  shift 27
+	.  error
+
+
+state 13
+	tagList:  lvalue.    (6)
+	tagList:  lvalue.COMMA tagList 
+
+	COMMA  shift 28
+	.  reduce 6 (src line 89)
+
+
+state 14
+	lvalue:  LVALUE.    (46)
+
+	.  reduce 46 (src line 340)
+
+
+state 15
+	query:  DELETE dataClause.whereClause SEMICOLON 
+
+	WHERE  shift 17
+	.  error
+
+	whereClause  goto 29
+
+state 16
+	query:  DELETE whereClause.SEMICOLON 
+
+	SEMICOLON  shift 30
+	.  error
+
+
+state 17
+	whereClause:  WHERE.whereList 
+
+	LVALUE  shift 14
+	HAS  shift 35
+	NOT  shift 32
+	LPAREN  shift 37
+	LBRACK  shift 38
+	.  error
+
+	whereList  goto 31
+	whereTerm  goto 33
+	valueListBrack  goto 36
+	lvalue  goto 34
+
+state 18
+	query:  SELECT selector whereClause.SEMICOLON 
+
+	SEMICOLON  shift 39
+	.  error
+
+
+state 19
+	query:  SELECT selector SEMICOLON.    (2)
+
+	.  reduce 2 (src line 64)
+
+
+state 20
+	query:  SELECT dataClause whereClause.SEMICOLON 
+
+	SEMICOLON  shift 40
+	.  error
+
+
+state 21
+	selector:  DISTINCT lvalue.    (13)
+
+	.  reduce 13 (src line 123)
+
+
+state 22
+	dataClause:  DATA IN.LPAREN timeref COMMA timeref RPAREN limit timeconv 
+	dataClause:  DATA IN.timeref COMMA timeref limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	LPAREN  shift 41
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 42
+	abstime  goto 43
+	qstring  goto 45
+
+state 23
+	dataClause:  DATA BEFORE.timeref limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 48
+	abstime  goto 43
+	qstring  goto 45
+
+state 24
+	dataClause:  DATA AFTER.timeref limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 49
+	abstime  goto 43
+	qstring  goto 45
+
+state 25
+	dataClause:  STATISTICAL LPAREN.NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	NUMBER  shift 50
+	.  error
+
+
+state 26
+	dataClause:  STATISTICS LPAREN.NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	NUMBER  shift 51
+	.  error
+
+
+state 27
+	dataClause:  WINDOW LPAREN.NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	NUMBER  shift 52
+	.  error
+
+
+state 28
+	tagList:  lvalue COMMA.tagList 
+
+	LVALUE  shift 14
+	.  error
+
+	tagList  goto 53
+	lvalue  goto 13
+
+state 29
+	query:  DELETE dataClause whereClause.SEMICOLON 
+
+	SEMICOLON  shift 54
+	.  error
+
+
+state 30
+	query:  DELETE whereClause SEMICOLON.    (5)
+
+	.  reduce 5 (src line 81)
+
+
+state 31
+	whereClause:  WHERE whereList.    (36)
+	whereList:  whereList.AND whereTerm 
+	whereList:  whereList.OR whereTerm 
+
+	AND  shift 55
+	OR  shift 56
+	.  reduce 36 (src line 293)
+
+
+state 32
+	whereList:  NOT.whereTerm 
+
+	LVALUE  shift 14
+	HAS  shift 35
+	LPAREN  shift 37
+	LBRACK  shift 38
+	.  error
+
+	whereTerm  goto 57
+	valueListBrack  goto 36
+	lvalue  goto 34
+
+state 33
+	whereList:  whereTerm.    (50)
+
+	.  reduce 50 (src line 364)
+
+
+state 34
+	whereTerm:  lvalue.LIKE qstring 
+	whereTerm:  lvalue.EQ qstring 
+	whereTerm:  lvalue.EQ NUMBER 
+	whereTerm:  lvalue.NEQ qstring 
+
+	EQ  shift 59
+	NEQ  shift 60
+	LIKE  shift 58
+	.  error
+
+
+state 35
+	whereTerm:  HAS.lvalue 
+
+	LVALUE  shift 14
+	.  error
+
+	lvalue  goto 61
+
+state 36
+	whereTerm:  valueListBrack.IN lvalue 
+	whereTerm:  valueListBrack.NOT IN lvalue 
+
+	NOT  shift 63
+	IN  shift 62
+	.  error
+
+
+state 37
+	whereTerm:  LPAREN.whereTerm RPAREN 
+
+	LVALUE  shift 14
+	HAS  shift 35
+	LPAREN  shift 37
+	LBRACK  shift 38
+	.  error
+
+	whereTerm  goto 64
+	valueListBrack  goto 36
+	lvalue  goto 34
+
+state 38
+	valueListBrack:  LBRACK.valueList RBRACK 
+
+	QSTRING  shift 47
+	.  error
+
+	valueList  goto 65
+	qstring  goto 66
+
+state 39
+	query:  SELECT selector whereClause SEMICOLON.    (1)
+
+	.  reduce 1 (src line 58)
+
+
+state 40
+	query:  SELECT dataClause whereClause SEMICOLON.    (3)
+
+	.  reduce 3 (src line 69)
+
+
+state 41
+	dataClause:  DATA IN LPAREN.timeref COMMA timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 67
+	abstime  goto 43
+	qstring  goto 45
+
+state 42
+	dataClause:  DATA IN timeref.COMMA timeref limit timeconv 
+
+	COMMA  shift 68
+	.  error
+
+
+state 43
+	timeref:  abstime.    (22)
+	timeref:  abstime.reltime 
+
+	NUMBER  shift 70
+	.  reduce 22 (src line 177)
+
+	reltime  goto 69
+
+state 44
+	abstime:  NUMBER.LVALUE 
+	abstime:  NUMBER.    (25)
+
+	LVALUE  shift 71
+	.  reduce 25 (src line 195)
+
+
+state 45
+	abstime:  qstring.    (26)
+
+	.  reduce 26 (src line 203)
+
+
+state 46
+	abstime:  NOW.    (27)
+
+	.  reduce 27 (src line 219)
+
+
+state 47
+	qstring:  QSTRING.    (45)
+
+	.  reduce 45 (src line 334)
+
+
+state 48
+	dataClause:  DATA BEFORE timeref.limit timeconv 
+	limit: .    (30)
+
+	LIMIT  shift 73
+	STREAMLIMIT  shift 74
+	.  reduce 30 (src line 243)
+
+	limit  goto 72
+
+state 49
+	dataClause:  DATA AFTER timeref.limit timeconv 
+	limit: .    (30)
+
+	LIMIT  shift 73
+	STREAMLIMIT  shift 74
+	.  reduce 30 (src line 243)
+
+	limit  goto 75
+
+state 50
+	dataClause:  STATISTICAL LPAREN NUMBER.RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	RPAREN  shift 76
+	.  error
+
+
+state 51
+	dataClause:  STATISTICS LPAREN NUMBER.RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	RPAREN  shift 77
+	.  error
+
+
+state 52
+	dataClause:  WINDOW LPAREN NUMBER.lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	LVALUE  shift 14
+	.  error
+
+	lvalue  goto 78
+
+state 53
+	tagList:  lvalue COMMA tagList.    (7)
+
+	.  reduce 7 (src line 93)
+
+
+state 54
+	query:  DELETE dataClause whereClause SEMICOLON.    (4)
+
+	.  reduce 4 (src line 75)
+
+
+state 55
+	whereList:  whereList AND.whereTerm 
+
+	LVALUE  shift 14
+	HAS  shift 35
+	LPAREN  shift 37
+	LBRACK  shift 38
+	.  error
+
+	whereTerm  goto 79
+	valueListBrack  goto 36
+	lvalue  goto 34
+
+state 56
+	whereList:  whereList OR.whereTerm 
+
+	LVALUE  shift 14
+	HAS  shift 35
+	LPAREN  shift 37
+	LBRACK  shift 38
+	.  error
+
+	whereTerm  goto 80
+	valueListBrack  goto 36
+	lvalue  goto 34
+
+state 57
+	whereList:  NOT whereTerm.    (49)
+
+	.  reduce 49 (src line 356)
+
+
+state 58
+	whereTerm:  lvalue LIKE.qstring 
+
+	QSTRING  shift 47
+	.  error
+
+	qstring  goto 81
+
+state 59
+	whereTerm:  lvalue EQ.qstring 
+	whereTerm:  lvalue EQ.NUMBER 
+
+	QSTRING  shift 47
+	NUMBER  shift 83
+	.  error
+
+	qstring  goto 82
+
+state 60
+	whereTerm:  lvalue NEQ.qstring 
+
+	QSTRING  shift 47
+	.  error
+
+	qstring  goto 84
+
+state 61
+	whereTerm:  HAS lvalue.    (41)
+
+	.  reduce 41 (src line 316)
+
+
+state 62
+	whereTerm:  valueListBrack IN.lvalue 
+
+	LVALUE  shift 14
+	.  error
+
+	lvalue  goto 85
+
+state 63
+	whereTerm:  valueListBrack NOT.IN lvalue 
+
+	IN  shift 86
+	.  error
+
+
+state 64
+	whereTerm:  LPAREN whereTerm.RPAREN 
+
+	RPAREN  shift 87
+	.  error
+
+
+state 65
+	valueListBrack:  LBRACK valueList.RBRACK 
+
+	RBRACK  shift 88
+	.  error
+
+
+state 66
+	valueList:  qstring.    (9)
+	valueList:  qstring.COMMA valueList 
+
+	COMMA  shift 89
+	.  reduce 9 (src line 104)
+
+
+state 67
+	dataClause:  DATA IN LPAREN timeref.COMMA timeref RPAREN limit timeconv 
+
+	COMMA  shift 90
+	.  error
+
+
+state 68
+	dataClause:  DATA IN timeref COMMA.timeref limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 91
+	abstime  goto 43
+	qstring  goto 45
+
+state 69
+	timeref:  abstime reltime.    (23)
+
+	.  reduce 23 (src line 181)
+
+
+state 70
+	reltime:  NUMBER.lvalue 
+	reltime:  NUMBER.lvalue reltime 
+
+	LVALUE  shift 14
+	.  error
+
+	lvalue  goto 92
+
+state 71
+	abstime:  NUMBER LVALUE.    (24)
+
+	.  reduce 24 (src line 187)
+
+
+state 72
+	dataClause:  DATA BEFORE timeref limit.timeconv 
+	timeconv: .    (34)
+
+	AS  shift 94
+	.  reduce 34 (src line 277)
+
+	timeconv  goto 93
+
+state 73
+	limit:  LIMIT.NUMBER 
+	limit:  LIMIT.NUMBER STREAMLIMIT NUMBER 
+
+	NUMBER  shift 95
+	.  error
+
+
+state 74
+	limit:  STREAMLIMIT.NUMBER 
+
+	NUMBER  shift 96
+	.  error
+
+
+state 75
+	dataClause:  DATA AFTER timeref limit.timeconv 
+	timeconv: .    (34)
+
+	AS  shift 94
+	.  reduce 34 (src line 277)
+
+	timeconv  goto 97
+
+state 76
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN.DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	DATA  shift 98
+	.  error
+
+
+state 77
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN.DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	DATA  shift 99
+	.  error
+
+
+state 78
+	dataClause:  WINDOW LPAREN NUMBER lvalue.RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	RPAREN  shift 100
+	.  error
+
+
+state 79
+	whereList:  whereList AND whereTerm.    (47)
+
+	.  reduce 47 (src line 348)
+
+
+state 80
+	whereList:  whereList OR whereTerm.    (48)
+
+	.  reduce 48 (src line 352)
+
+
+state 81
+	whereTerm:  lvalue LIKE qstring.    (37)
+
+	.  reduce 37 (src line 300)
+
+
+state 82
+	whereTerm:  lvalue EQ qstring.    (38)
+
+	.  reduce 38 (src line 304)
+
+
+state 83
+	whereTerm:  lvalue EQ NUMBER.    (39)
+
+	.  reduce 39 (src line 308)
+
+
+state 84
+	whereTerm:  lvalue NEQ qstring.    (40)
+
+	.  reduce 40 (src line 312)
+
+
+state 85
+	whereTerm:  valueListBrack IN lvalue.    (42)
+
+	.  reduce 42 (src line 320)
+
+
+state 86
+	whereTerm:  valueListBrack NOT IN.lvalue 
+
+	LVALUE  shift 14
+	.  error
+
+	lvalue  goto 101
+
+state 87
+	whereTerm:  LPAREN whereTerm RPAREN.    (44)
+
+	.  reduce 44 (src line 328)
+
+
+state 88
+	valueListBrack:  LBRACK valueList RBRACK.    (8)
+
+	.  reduce 8 (src line 99)
+
+
+state 89
+	valueList:  qstring COMMA.valueList 
+
+	QSTRING  shift 47
+	.  error
+
+	valueList  goto 102
+	qstring  goto 66
+
+state 90
+	dataClause:  DATA IN LPAREN timeref COMMA.timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 103
+	abstime  goto 43
+	qstring  goto 45
+
+state 91
+	dataClause:  DATA IN timeref COMMA timeref.limit timeconv 
+	limit: .    (30)
+
+	LIMIT  shift 73
+	STREAMLIMIT  shift 74
+	.  reduce 30 (src line 243)
+
+	limit  goto 104
+
+state 92
+	reltime:  NUMBER lvalue.    (28)
+	reltime:  NUMBER lvalue.reltime 
+
+	NUMBER  shift 70
+	.  reduce 28 (src line 225)
+
+	reltime  goto 105
+
+state 93
+	dataClause:  DATA BEFORE timeref limit timeconv.    (20)
+
+	.  reduce 20 (src line 167)
+
+
+state 94
+	timeconv:  AS.LVALUE 
+
+	LVALUE  shift 106
+	.  error
+
+
+state 95
+	limit:  LIMIT NUMBER.    (31)
+	limit:  LIMIT NUMBER.STREAMLIMIT NUMBER 
+
+	STREAMLIMIT  shift 107
+	.  reduce 31 (src line 247)
+
+
+state 96
+	limit:  STREAMLIMIT NUMBER.    (32)
+
+	.  reduce 32 (src line 255)
+
+
+state 97
+	dataClause:  DATA AFTER timeref limit timeconv.    (21)
+
+	.  reduce 21 (src line 171)
+
+
+state 98
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA.IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	IN  shift 108
+	.  error
+
+
+state 99
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA.IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	IN  shift 109
+	.  error
+
+
+state 100
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN.DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	DATA  shift 110
+	.  error
+
+
+state 101
+	whereTerm:  valueListBrack NOT IN lvalue.    (43)
+
+	.  reduce 43 (src line 324)
+
+
+state 102
+	valueList:  qstring COMMA valueList.    (10)
+
+	.  reduce 10 (src line 108)
+
+
+state 103
+	dataClause:  DATA IN LPAREN timeref COMMA timeref.RPAREN limit timeconv 
+
+	RPAREN  shift 111
+	.  error
+
+
+state 104
+	dataClause:  DATA IN timeref COMMA timeref limit.timeconv 
+	timeconv: .    (34)
+
+	AS  shift 94
+	.  reduce 34 (src line 277)
+
+	timeconv  goto 112
+
+state 105
+	reltime:  NUMBER lvalue reltime.    (29)
+
+	.  reduce 29 (src line 233)
+
+
+state 106
+	timeconv:  AS LVALUE.    (35)
+
+	.  reduce 35 (src line 281)
+
+
+state 107
+	limit:  LIMIT NUMBER STREAMLIMIT.NUMBER 
+
+	NUMBER  shift 113
+	.  error
+
+
+state 108
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN.LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	LPAREN  shift 114
+	.  error
+
+
+state 109
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN.LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	LPAREN  shift 115
+	.  error
+
+
+state 110
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA.IN LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	IN  shift 116
+	.  error
+
+
+state 111
+	dataClause:  DATA IN LPAREN timeref COMMA timeref RPAREN.limit timeconv 
+	limit: .    (30)
+
+	LIMIT  shift 73
+	STREAMLIMIT  shift 74
+	.  reduce 30 (src line 243)
+
+	limit  goto 117
+
+state 112
+	dataClause:  DATA IN timeref COMMA timeref limit timeconv.    (16)
+
+	.  reduce 16 (src line 139)
+
+
+state 113
+	limit:  LIMIT NUMBER STREAMLIMIT NUMBER.    (33)
+
+	.  reduce 33 (src line 263)
+
+
+state 114
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN.timeref COMMA timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 118
+	abstime  goto 43
+	qstring  goto 45
+
+state 115
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN.timeref COMMA timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 119
+	abstime  goto 43
+	qstring  goto 45
+
+state 116
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN.LPAREN timeref COMMA timeref RPAREN limit timeconv 
+
+	LPAREN  shift 120
+	.  error
+
+
+state 117
+	dataClause:  DATA IN LPAREN timeref COMMA timeref RPAREN limit.timeconv 
+	timeconv: .    (34)
+
+	AS  shift 94
+	.  reduce 34 (src line 277)
+
+	timeconv  goto 121
+
+state 118
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN timeref.COMMA timeref RPAREN limit timeconv 
+
+	COMMA  shift 122
+	.  error
+
+
+state 119
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref.COMMA timeref RPAREN limit timeconv 
+
+	COMMA  shift 123
+	.  error
+
+
+state 120
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN.timeref COMMA timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 124
+	abstime  goto 43
+	qstring  goto 45
+
+state 121
+	dataClause:  DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (15)
+
+	.  reduce 15 (src line 135)
+
+
+state 122
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA.timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 125
+	abstime  goto 43
+	qstring  goto 45
+
+state 123
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA.timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 126
+	abstime  goto 43
+	qstring  goto 45
+
+state 124
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref.COMMA timeref RPAREN limit timeconv 
+
+	COMMA  shift 127
+	.  error
+
+
+state 125
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref.RPAREN limit timeconv 
+
+	RPAREN  shift 128
+	.  error
+
+
+state 126
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref.RPAREN limit timeconv 
+
+	RPAREN  shift 129
+	.  error
+
+
+state 127
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA.timeref RPAREN limit timeconv 
+
+	NOW  shift 46
+	QSTRING  shift 47
+	NUMBER  shift 44
+	.  error
+
+	timeref  goto 130
+	abstime  goto 43
+	qstring  goto 45
+
+state 128
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN.limit timeconv 
+	limit: .    (30)
+
+	LIMIT  shift 73
+	STREAMLIMIT  shift 74
+	.  reduce 30 (src line 243)
+
+	limit  goto 131
+
+state 129
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN.limit timeconv 
+	limit: .    (30)
+
+	LIMIT  shift 73
+	STREAMLIMIT  shift 74
+	.  reduce 30 (src line 243)
+
+	limit  goto 132
+
+state 130
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref.RPAREN limit timeconv 
+
+	RPAREN  shift 133
+	.  error
+
+
+state 131
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit.timeconv 
+	timeconv: .    (34)
+
+	AS  shift 94
+	.  reduce 34 (src line 277)
+
+	timeconv  goto 134
+
+state 132
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit.timeconv 
+	timeconv: .    (34)
+
+	AS  shift 94
+	.  reduce 34 (src line 277)
+
+	timeconv  goto 135
+
+state 133
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN.limit timeconv 
+	limit: .    (30)
+
+	LIMIT  shift 73
+	STREAMLIMIT  shift 74
+	.  reduce 30 (src line 243)
+
+	limit  goto 136
+
+state 134
+	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (17)
+
+	.  reduce 17 (src line 143)
+
+
+state 135
+	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (18)
+
+	.  reduce 18 (src line 151)
+
+
+state 136
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit.timeconv 
+	timeconv: .    (34)
+
+	AS  shift 94
+	.  reduce 34 (src line 277)
+
+	timeconv  goto 137
+
+state 137
+	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (19)
+
+	.  reduce 19 (src line 159)
+
+
+40 terminals, 17 nonterminals
+51 grammar rules, 138/2000 states
+0 shift/reduce, 0 reduce/reduce conflicts reported
+66 working sets used
+memory: parser 92/30000
+30 extra closures
+164 shift entries, 1 exceptions
+63 goto entries
+30 entries saved by goto default
+Optimizer space used: output 157/30000
+157 table entries, 1 zero
+maximum spread: 38, maximum offset: 136
