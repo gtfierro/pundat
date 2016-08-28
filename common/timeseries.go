@@ -46,6 +46,12 @@ func (ts *Timeseries) AddRecord(rec *TimeseriesReading) {
 	ts.Unlock()
 }
 
+func (ts *Timeseries) NumReadings() int {
+	ts.RLock()
+	defer ts.RUnlock()
+	return len(ts.Records)
+}
+
 type StatisticTimeseries struct {
 	sync.RWMutex
 	Records    []*StatisticsReading
@@ -58,4 +64,14 @@ func (ts *StatisticTimeseries) AddRecord(rec *StatisticsReading) {
 	ts.Lock()
 	ts.Records = append(ts.Records, rec)
 	ts.Unlock()
+}
+
+func (ts *StatisticTimeseries) NumReadings() int {
+	ts.RLock()
+	defer ts.RUnlock()
+	return len(ts.Records)
+}
+
+type TimeseriesDataGroup interface {
+	NumReadings() int
 }
