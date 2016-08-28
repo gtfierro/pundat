@@ -35,6 +35,7 @@ func (qp *QueryProcessor) Parse(querystring string) *ParsedQuery {
 	}
 	i := 0
 	for key, _ := range l._keys {
+		//TODO: put this in mongo-specific file deeper in the archiver?
 		pq.Keys[i] = cleantagstring(key)
 		i += 1
 	}

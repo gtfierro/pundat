@@ -52,7 +52,7 @@ func (m *mongoStore) addIndexes() {
 	var err error
 	// create indexes
 	index := mgo.Index{
-		Key:        []string{"UUID"},
+		Key:        []string{"uuid"},
 		Unique:     false,
 		DropDups:   false,
 		Background: false,
@@ -60,36 +60,36 @@ func (m *mongoStore) addIndexes() {
 	}
 	err = m.metadata.EnsureIndex(index)
 	if err != nil {
-		log.Fatalf("Could not create index on metadata.UUID (%v)", err)
+		log.Fatalf("Could not create index on metadata.uuid (%v)", err)
 	}
 
-	index.Key = []string{"Path"}
+	index.Key = []string{"path"}
 	index.Unique = false
 	err = m.metadata.EnsureIndex(index)
 	if err != nil {
-		log.Fatalf("Could not create index on metadata.Path (%v)", err)
+		log.Fatalf("Could not create index on metadata.path (%v)", err)
 	}
 
-	index.Key = []string{"SrcURI"}
+	index.Key = []string{"srcuRI"}
 	index.Unique = false
 	err = m.metadata.EnsureIndex(index)
 	if err != nil {
-		log.Fatalf("Could not create index on metadata.URI (%v)", err)
+		log.Fatalf("Could not create index on metadata.uri (%v)", err)
 	}
 
-	index.Key = []string{"Key"}
+	index.Key = []string{"key"}
 	index.Unique = false
 	err = m.metadata.EnsureIndex(index)
 	if err != nil {
-		log.Fatalf("Could not create index on metadata.Key (%v)", err)
+		log.Fatalf("Could not create index on metadata.key (%v)", err)
 	}
 
 	// mapping indexes
-	index.Key = []string{"UUID"}
+	index.Key = []string{"uuid"}
 	index.Unique = true
 	err = m.mapping.EnsureIndex(index)
 	if err != nil {
-		log.Fatalf("Could not create index on mapping.UUID (%v)", err)
+		log.Fatalf("Could not create index on mapping.uuid (%v)", err)
 	}
 
 }
@@ -176,7 +176,7 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 	}
 	for _, rec := range records {
 		log.Debugf("Inserting %+v", rec)
-		if _, err := m.metadata.Upsert(bson.M{"Key": rec.Key, "SrcURI": rec.SrcURI}, rec); err != nil {
+		if _, err := m.metadata.Upsert(bson.M{"key": rec.Key, "srcuri": rec.SrcURI}, rec); err != nil {
 			return err
 		}
 	}
@@ -208,7 +208,7 @@ func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict)
 }
 
 func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
-	err := m.mapping.Insert(bson.M{"URI": uri, "UUID": uuid})
+	err := m.mapping.Insert(bson.M{"uri": uri, "uuid": uuid})
 	m.uriUUIDCache.Set(uri, uuid, time.Minute*10)
 	if mgo.IsDup(err) {
 		return nil
@@ -221,7 +221,7 @@ func (m *mongoStore) URItoUUID(uri string) (common.UUID, error) {
 		var (
 			uuid common.UUID
 		)
-		err := m.mapping.Find(bson.M{"URI": uri}).Select(bson.M{"uuid": 1}).One(&uuid)
+		err := m.mapping.Find(bson.M{"uri": uri}).Select(bson.M{"uuid": 1}).One(&uuid)
 		if err != nil {
 			return nil, nil
 		}
