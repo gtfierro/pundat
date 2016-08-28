@@ -103,3 +103,14 @@ func (a *Archiver) Stop() {
 
 func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 }
+
+func (a *Archiver) HandleQuery(query string) {
+}
+
+//func (a *Archiver) SelectTags(params *common.TagParams) (QueryResult, error) {
+//func (a *Archiver) DistinctTag(params *common.DistinctParams) (QueryResult, error) {
+//func (a *Archiver) SelectDataRange(params *common.DataParams) (common.SmapMessageList, error) {
+//func (a *Archiver) SelectDataBefore(params *common.DataParams) (result common.SmapMessageList, err error) {
+//func (a *Archiver) SelectDataAfter(params *common.DataParams) (result common.SmapMessageList, err error) {
+//func (a *Archiver) SelectStatisticalData(params *common.DataParams) (result common.SmapMessageList, err error) {
+//func (a *Archiver) DeleteData(params *common.DataParams) (err error) {
