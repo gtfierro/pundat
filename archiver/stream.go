@@ -37,13 +37,14 @@ func (s *Stream) URI() string {
 	return s.uri
 }
 
-//TODO: database reference goes here
 func (s *Stream) startArchiving(store TimeseriesStore) {
 	ts := common.Timeseries{
 		UUID:   s.UUID,
 		SrcURI: s.uri,
 	}
-	//TODO: batching
+	//TODO: Consider batching delivering new readings to BtrDB
+	// Right now we deliver readings one by one to BtrDB. If the serialization becomes
+	// a bottleneck, we should batch readings to amortize that cost
 	go func() {
 		for msg := range s.subscription {
 			for _, po := range msg.POs {
@@ -62,7 +63,12 @@ func (s *Stream) startArchiving(store TimeseriesStore) {
 					s.UUID = ob.Eval(s.uuidExpr, thing).(common.UUID)
 				}
 				log.Noticef("UUID: %v, Value: %v, time %v", s.UUID, value, time)
-				ts.Records = []*common.TimeseriesReading{{Time: time, Value: value.(float64)}}
+				value_f64, ok := value.(float64)
+				if !ok {
+					log.Errorf("Value %+v was not a float64", value)
+					continue
+				}
+				ts.Records = []*common.TimeseriesReading{{Time: time, Value: value_f64}}
 				if err := store.AddReadings(ts); err != nil {
 					log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
 				}
