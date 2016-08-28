@@ -1,7 +1,9 @@
 package archiver
 
 import (
+	"fmt"
 	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/durandal/querylang"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
@@ -32,6 +34,7 @@ type Archiver struct {
 	iface     *bw2.Interface
 	vm        *viewManager
 	ms        *metadatasubscriber
+	qp        *querylang.QueryProcessor
 	namespace string
 	config    *Config
 	stop      chan bool
@@ -73,6 +76,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.vm = newViewManager(a.bw, a.MD, a.TS, a.ms)
 
 	// TODO: listen for queries
+	a.qp = querylang.NewQueryProcessor()
 
 	// TODO: create the View to listen for the archive requests
 	a.svc = a.bw.RegisterService(c.BOSSWAVE.DeployNS, "s.giles")
@@ -102,9 +106,86 @@ func (a *Archiver) Stop() {
 }
 
 func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
+	var (
+		// the publisher of the message. We incorporate this into the signal URI
+		fromVK string
+		// the computed signal based on the VK and query nonce
+		signalURI string
+		// query message
+		query KeyValueQuery
+	)
+	fromVK = msg.From
+	po := msg.GetOnePODF(bw2.PODFGilesKeyValueQuery)
+	if po == nil { // no query found
+		return
+	}
+
+	if obj, ok := po.(bw2.MsgPackPayloadObject); !ok {
+		log.Error("Received query was not msgpack")
+	} else if err := obj.ValueInto(&query); err != nil {
+		log.Error(errors.Wrap(err, "Could not unmarshal received query"))
+		return
+	}
+
+	signalURI = fmt.Sprintf("%s,queries", fromVK[:len(fromVK)-1])
+
+	log.Infof("Got query %+v", query)
+	mdRes, tsRes, err := a.HandleQuery(fromVK, query.Query)
+	if err != nil {
+		msg := QueryError{
+			Query: query.Query,
+			Nonce: query.Nonce,
+			Error: err.Error(),
+		}
+		po, _ := bw2.CreateMsgPackPayloadObject(bw2.PONumGilesQueryError, msg)
+		log.Error(errors.Wrap(err, "Error evaluating query"))
+		if err := a.iface.PublishSignal(signalURI, po); err != nil {
+			log.Error(errors.Wrap(err, "Error sending response"))
+		}
+	}
+
+	//var reply []bw2.PayloadObject
+
+	log.Infof("Got Metadata %+v", mdRes)
+	log.Infof("Got Timeseries %+v", tsRes)
+
+	//	switch t := res.(type) {
+	//	case common.SmapMessageList:
+	//		log.Debug("smap messages list")
+	//		pos := POsFromSmapMessageList(query.Nonce, t)
+	//		reply = append(reply, pos...)
+	//	case common.DistinctResult:
+	//		log.Debug("distinct list")
+	//		reply = append(reply, POFromDistinctResult(query.Nonce, t))
+	//	default:
+	//		log.Debug("type %T", res)
+	//	}
+	//	log.Debugf("Reply on %s: %d", a.iface.SignalURI(signalURI), len(reply))
+	//
+	//	if err := a.iface.PublishSignal(signalURI, reply...); err != nil {
+	//		log.Error(errors.Wrap(err, "Error sending response"))
+	//	}
 }
 
-func (a *Archiver) HandleQuery(query string) {
+func (a *Archiver) HandleQuery(vk, query string) (mdResult *common.MetadataGroup, tsResult *common.TimeseriesDataGroup, err error) {
+	parsed := a.qp.Parse(query)
+	if parsed.Err != nil {
+		err = fmt.Errorf("Error (%v) in query \"%v\" (error at %v)\n", parsed.Err, query, parsed.ErrPos)
+		return
+	}
+
+	switch parsed.QueryType {
+	case querylang.SELECT_TYPE:
+		if parsed.Distinct {
+			err = fmt.Errorf("DISTINCT not implemented yet sorry")
+			return
+		}
+		params := parsed.GetParams().(*common.TagParams)
+		mdResult, err = a.SelectTags(vk, params)
+		return
+	}
+
+	return
 }
 
 //func (a *Archiver) SelectTags(params *common.TagParams) (QueryResult, error) {
