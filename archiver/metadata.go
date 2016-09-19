@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/durandal/prefix"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"sync"
@@ -51,6 +52,7 @@ func (sub *subscription) dec() {
 type metadatasubscriber struct {
 	client        *bw2.BW2Client
 	store         MetadataStore
+	pfx           *prefix.PrefixStore
 	subscriptions map[string]*subscription
 	uncommitted   []*common.MetadataRecord
 	commitLock    sync.Mutex
@@ -58,12 +60,13 @@ type metadatasubscriber struct {
 	sync.RWMutex
 }
 
-func newMetadataSubscriber(client *bw2.BW2Client, store MetadataStore) *metadatasubscriber {
+func newMetadataSubscriber(client *bw2.BW2Client, store MetadataStore, pfx *prefix.PrefixStore) *metadatasubscriber {
 	ms := &metadatasubscriber{
 		client:        client,
 		store:         store,
+		pfx:           pfx,
 		subscriptions: make(map[string]*subscription),
-		commitTimer:   time.NewTicker(10 * time.Second),
+		commitTimer:   time.NewTicker(5 * time.Second),
 	}
 	go func() {
 		for _ = range ms.commitTimer.C {
@@ -106,8 +109,13 @@ func (ms *metadatasubscriber) requestSubscription(uri string) {
 				if rec == nil {
 					continue
 				}
+				if err := ms.pfx.AddMetadataURI(msg.URI); err != nil {
+					log.Error(errors.Wrap(err, "Could not save MetadataURI"))
+				}
 				s.lastValue = rec
+				ms.Lock()
 				ms.uncommitted = append(ms.uncommitted, rec)
+				ms.Unlock()
 			case <-s.cancel:
 				close(s.sub)
 				return

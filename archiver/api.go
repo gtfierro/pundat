@@ -4,7 +4,7 @@ import (
 	"github.com/gtfierro/durandal/common"
 )
 
-func (a *Archiver) SelectTags(vk string, params *common.TagParams) (*common.MetadataGroup, error) {
+func (a *Archiver) SelectTags(vk string, params *common.TagParams) ([]common.MetadataGroup, error) {
 	return a.MD.GetMetadata(vk, params.Tags, params.Where)
 }
 
@@ -40,16 +40,17 @@ func (a *Archiver) SelectDataRange(params *common.DataParams) ([]common.Timeseri
 	return result, nil
 }
 
-//// selects the data point most immediately before the Start parameter for all matching streams
-//func (a *Archiver) SelectDataBefore(params *common.DataParams) (result common.SmapMessageList, err error) {
-//	var readings []common.SmapNumbersResponse
-//	if err = a.prepareDataParams(params); err != nil {
-//		return
-//	}
-//	readings, err = a.TS.Prev(params.UUIDs, params.Begin)
-//	result = a.packResults(params, readings)
-//	return
-//}
+// selects the data point most immediately before the Start parameter for all matching streams
+func (a *Archiver) SelectDataBefore(params *common.DataParams) (result []common.Timeseries, err error) {
+	if err = a.prepareDataParams(params); err != nil {
+		return
+	}
+	log.Warning("PARAMS", params)
+	result, err = a.TS.Prev(params.UUIDs, params.Begin)
+	result = a.packResults(params, result)
+	return
+}
+
 //
 //// selects the data point most immediately after the Start parameter for all matching streams
 //func (a *Archiver) SelectDataAfter(params *common.DataParams) (result common.SmapMessageList, err error) {
@@ -94,11 +95,13 @@ func (a *Archiver) SelectDataRange(params *common.DataParams) ([]common.Timeseri
 func (a *Archiver) prepareDataParams(params *common.DataParams) (err error) {
 	// parse and evaluate the where clause if we need to
 	if len(params.Where) > 0 {
-		//params.UUIDs, err = a.mdStore.GetMetadata([]string{"UUID"}, params.Where.ToBson())
+		params.UUIDs, err = a.MD.GetUUIDs("", params.Where)
 		if err != nil {
 			return err
 		}
 	}
+
+	log.Debug("UUIDS", params.UUIDs, params.Where)
 
 	// apply the streamlimit if it exists
 	if params.StreamLimit > 0 && len(params.UUIDs) > params.StreamLimit {

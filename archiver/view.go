@@ -3,9 +3,9 @@ package archiver
 import (
 	"encoding/base64"
 	"github.com/gtfierro/durandal/common"
-	ob "github.com/gtfierro/giles2/objectbuilder"
+	"github.com/gtfierro/durandal/prefix"
+	"github.com/gtfierro/ob"
 	"github.com/pkg/errors"
-	"github.com/satori/go.uuid"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"reflect"
 	"strings"
@@ -17,6 +17,7 @@ type viewManager struct {
 	client *bw2.BW2Client
 	store  MetadataStore
 	ts     TimeseriesStore
+	pfx    *prefix.PrefixStore
 	subber *metadatasubscriber
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
@@ -25,11 +26,12 @@ type viewManager struct {
 	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client, store MetadataStore, ts TimeseriesStore, subber *metadatasubscriber) *viewManager {
+func newViewManager(client *bw2.BW2Client, store MetadataStore, ts TimeseriesStore, pfx *prefix.PrefixStore, subber *metadatasubscriber) *viewManager {
 	return &viewManager{
 		client:           client,
 		store:            store,
 		ts:               ts,
+		pfx:              pfx,
 		subber:           subber,
 		namespaceAliases: make(map[string]string),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
@@ -110,7 +112,6 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 			// TODO: does the FROM VK have permission to ask this?
 			requests = append(requests, request)
 		}
-		// TODO: handle requests
 		for _, request := range requests {
 			if err := vm.HandleArchiveRequest(request); err != nil {
 				log.Error(errors.Wrapf(err, "Could not handle archive request %+v", request))
@@ -138,16 +139,17 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 		return errors.New("VK was empty in ArchiveRequest")
 	}
 
+	// a Stream's URI is its subscription for timeseries data
 	stream := &Stream{
-		uri:    request.URI,
-		cancel: make(chan bool),
+		uri:             request.URI,
+		cancel:          make(chan bool),
+		valueString:     request.Value,
+		inheritMetadata: request.InheritMetadata,
 	}
 
 	stream.valueExpr = ob.Parse(request.Value)
 
-	if request.UUID == "" {
-		stream.UUID = common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, request.URI+string(request.PO)+request.Value).String())
-	} else {
+	if request.UUID != "" {
 		stream.uuidExpr = ob.Parse(request.UUID)
 	}
 
@@ -155,18 +157,15 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 		stream.timeExpr = ob.Parse(request.Time)
 	}
 
-	//TODO: do we really need this?
-	//if request.MetadataExpr != "" {
-	//	stream.metadataExpr = ob.Parse(request.MetadataExpr)
-	//}
-
+	var metadataURIs []string
 	if request.InheritMetadata {
 		for _, uri := range GetURIPrefixes(request.URI) {
-			stream.metadata = append(stream.metadata, uri+"/!meta/+")
+			metadataURIs = append(metadataURIs, uri+"/!meta/+")
 		}
 	}
 	for _, uri := range request.MetadataURIs {
-		stream.metadata = append(stream.metadata, uri+"/!meta/+")
+		stream.metadataURIs = append(stream.metadataURIs, uri)
+		metadataURIs = append(metadataURIs, uri+"/!meta/+")
 	}
 
 	sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
@@ -177,18 +176,15 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	}
 	stream.subscription = sub
 
-	for _, muri := range stream.metadata {
+	for _, muri := range metadataURIs {
 		vm.subber.requestSubscription(muri)
 	}
 
 	// indicate that we've gotten an archive request
 	request.Dump()
 
-	if err := vm.store.MapURItoUUID(stream.uri, stream.UUID); err != nil {
-		return err
-	}
 	// now, we save the stream
-	stream.startArchiving(vm.ts)
+	stream.startArchiving(vm.ts, vm.store, vm.pfx)
 
 	return nil
 }
