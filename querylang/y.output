@@ -69,13 +69,13 @@ state 5
 state 6
 	selector:  tagList.    (11)
 
-	.  reduce 11 (src line 114)
+	.  reduce 11 (src line 115)
 
 
 state 7
 	selector:  ALL.    (12)
 
-	.  reduce 12 (src line 119)
+	.  reduce 12 (src line 120)
 
 
 state 8
@@ -83,7 +83,7 @@ state 8
 	selector:  DISTINCT.    (14)
 
 	LVALUE  shift 14
-	.  reduce 14 (src line 128)
+	.  reduce 14 (src line 129)
 
 	lvalue  goto 21
 
@@ -125,13 +125,13 @@ state 13
 	tagList:  lvalue.COMMA tagList 
 
 	COMMA  shift 28
-	.  reduce 6 (src line 89)
+	.  reduce 6 (src line 90)
 
 
 state 14
 	lvalue:  LVALUE.    (46)
 
-	.  reduce 46 (src line 380)
+	.  reduce 46 (src line 382)
 
 
 state 15
@@ -174,7 +174,7 @@ state 18
 state 19
 	query:  SELECT selector SEMICOLON.    (2)
 
-	.  reduce 2 (src line 64)
+	.  reduce 2 (src line 65)
 
 
 state 20
@@ -187,7 +187,7 @@ state 20
 state 21
 	selector:  DISTINCT lvalue.    (13)
 
-	.  reduce 13 (src line 123)
+	.  reduce 13 (src line 124)
 
 
 state 22
@@ -268,7 +268,7 @@ state 29
 state 30
 	query:  DELETE whereClause SEMICOLON.    (5)
 
-	.  reduce 5 (src line 81)
+	.  reduce 5 (src line 82)
 
 
 state 31
@@ -278,7 +278,7 @@ state 31
 
 	AND  shift 55
 	OR  shift 56
-	.  reduce 36 (src line 293)
+	.  reduce 36 (src line 294)
 
 
 state 32
@@ -297,7 +297,7 @@ state 32
 state 33
 	whereList:  whereTerm.    (50)
 
-	.  reduce 50 (src line 404)
+	.  reduce 50 (src line 406)
 
 
 state 34
@@ -354,13 +354,13 @@ state 38
 state 39
 	query:  SELECT selector whereClause SEMICOLON.    (1)
 
-	.  reduce 1 (src line 58)
+	.  reduce 1 (src line 59)
 
 
 state 40
 	query:  SELECT dataClause whereClause SEMICOLON.    (3)
 
-	.  reduce 3 (src line 69)
+	.  reduce 3 (src line 70)
 
 
 state 41
@@ -387,7 +387,7 @@ state 43
 	timeref:  abstime.reltime 
 
 	NUMBER  shift 70
-	.  reduce 22 (src line 177)
+	.  reduce 22 (src line 178)
 
 	reltime  goto 69
 
@@ -396,25 +396,25 @@ state 44
 	abstime:  NUMBER.    (25)
 
 	LVALUE  shift 71
-	.  reduce 25 (src line 195)
+	.  reduce 25 (src line 196)
 
 
 state 45
 	abstime:  qstring.    (26)
 
-	.  reduce 26 (src line 203)
+	.  reduce 26 (src line 204)
 
 
 state 46
 	abstime:  NOW.    (27)
 
-	.  reduce 27 (src line 219)
+	.  reduce 27 (src line 220)
 
 
 state 47
 	qstring:  QSTRING.    (45)
 
-	.  reduce 45 (src line 374)
+	.  reduce 45 (src line 375)
 
 
 state 48
@@ -423,7 +423,7 @@ state 48
 
 	LIMIT  shift 73
 	STREAMLIMIT  shift 74
-	.  reduce 30 (src line 243)
+	.  reduce 30 (src line 244)
 
 	limit  goto 72
 
@@ -433,7 +433,7 @@ state 49
 
 	LIMIT  shift 73
 	STREAMLIMIT  shift 74
-	.  reduce 30 (src line 243)
+	.  reduce 30 (src line 244)
 
 	limit  goto 75
 
@@ -462,13 +462,13 @@ state 52
 state 53
 	tagList:  lvalue COMMA tagList.    (7)
 
-	.  reduce 7 (src line 93)
+	.  reduce 7 (src line 94)
 
 
 state 54
 	query:  DELETE dataClause whereClause SEMICOLON.    (4)
 
-	.  reduce 4 (src line 75)
+	.  reduce 4 (src line 76)
 
 
 state 55
@@ -500,7 +500,7 @@ state 56
 state 57
 	whereList:  NOT whereTerm.    (49)
 
-	.  reduce 49 (src line 396)
+	.  reduce 49 (src line 398)
 
 
 state 58
@@ -532,7 +532,7 @@ state 60
 state 61
 	whereTerm:  HAS lvalue.    (41)
 
-	.  reduce 41 (src line 336)
+	.  reduce 41 (src line 337)
 
 
 state 62
@@ -569,7 +569,7 @@ state 66
 	valueList:  qstring.COMMA valueList 
 
 	COMMA  shift 89
-	.  reduce 9 (src line 104)
+	.  reduce 9 (src line 105)
 
 
 state 67
@@ -594,7 +594,7 @@ state 68
 state 69
 	timeref:  abstime reltime.    (23)
 
-	.  reduce 23 (src line 181)
+	.  reduce 23 (src line 182)
 
 
 state 70
@@ -609,7 +609,7 @@ state 70
 state 71
 	abstime:  NUMBER LVALUE.    (24)
 
-	.  reduce 24 (src line 187)
+	.  reduce 24 (src line 188)
 
 
 state 72
@@ -617,7 +617,7 @@ state 72
 	timeconv: .    (34)
 
 	AS  shift 94
-	.  reduce 34 (src line 277)
+	.  reduce 34 (src line 278)
 
 	timeconv  goto 93
 
@@ -641,7 +641,7 @@ state 75
 	timeconv: .    (34)
 
 	AS  shift 94
-	.  reduce 34 (src line 277)
+	.  reduce 34 (src line 278)
 
 	timeconv  goto 97
 
@@ -669,43 +669,43 @@ state 78
 state 79
 	whereList:  whereList AND whereTerm.    (47)
 
-	.  reduce 47 (src line 388)
+	.  reduce 47 (src line 390)
 
 
 state 80
 	whereList:  whereList OR whereTerm.    (48)
 
-	.  reduce 48 (src line 392)
+	.  reduce 48 (src line 394)
 
 
 state 81
 	whereTerm:  lvalue LIKE qstring.    (37)
 
-	.  reduce 37 (src line 300)
+	.  reduce 37 (src line 301)
 
 
 state 82
 	whereTerm:  lvalue EQ qstring.    (38)
 
-	.  reduce 38 (src line 309)
+	.  reduce 38 (src line 310)
 
 
 state 83
 	whereTerm:  lvalue EQ NUMBER.    (39)
 
-	.  reduce 39 (src line 318)
+	.  reduce 39 (src line 319)
 
 
 state 84
 	whereTerm:  lvalue NEQ qstring.    (40)
 
-	.  reduce 40 (src line 327)
+	.  reduce 40 (src line 328)
 
 
 state 85
 	whereTerm:  valueListBrack IN lvalue.    (42)
 
-	.  reduce 42 (src line 347)
+	.  reduce 42 (src line 348)
 
 
 state 86
@@ -719,13 +719,13 @@ state 86
 state 87
 	whereTerm:  LPAREN whereTerm RPAREN.    (44)
 
-	.  reduce 44 (src line 368)
+	.  reduce 44 (src line 369)
 
 
 state 88
 	valueListBrack:  LBRACK valueList RBRACK.    (8)
 
-	.  reduce 8 (src line 99)
+	.  reduce 8 (src line 100)
 
 
 state 89
@@ -755,7 +755,7 @@ state 91
 
 	LIMIT  shift 73
 	STREAMLIMIT  shift 74
-	.  reduce 30 (src line 243)
+	.  reduce 30 (src line 244)
 
 	limit  goto 104
 
@@ -764,14 +764,14 @@ state 92
 	reltime:  NUMBER lvalue.reltime 
 
 	NUMBER  shift 70
-	.  reduce 28 (src line 225)
+	.  reduce 28 (src line 226)
 
 	reltime  goto 105
 
 state 93
 	dataClause:  DATA BEFORE timeref limit timeconv.    (20)
 
-	.  reduce 20 (src line 167)
+	.  reduce 20 (src line 168)
 
 
 state 94
@@ -786,19 +786,19 @@ state 95
 	limit:  LIMIT NUMBER.STREAMLIMIT NUMBER 
 
 	STREAMLIMIT  shift 107
-	.  reduce 31 (src line 247)
+	.  reduce 31 (src line 248)
 
 
 state 96
 	limit:  STREAMLIMIT NUMBER.    (32)
 
-	.  reduce 32 (src line 255)
+	.  reduce 32 (src line 256)
 
 
 state 97
 	dataClause:  DATA AFTER timeref limit timeconv.    (21)
 
-	.  reduce 21 (src line 171)
+	.  reduce 21 (src line 172)
 
 
 state 98
@@ -825,13 +825,13 @@ state 100
 state 101
 	whereTerm:  valueListBrack NOT IN lvalue.    (43)
 
-	.  reduce 43 (src line 357)
+	.  reduce 43 (src line 358)
 
 
 state 102
 	valueList:  qstring COMMA valueList.    (10)
 
-	.  reduce 10 (src line 108)
+	.  reduce 10 (src line 109)
 
 
 state 103
@@ -846,20 +846,20 @@ state 104
 	timeconv: .    (34)
 
 	AS  shift 94
-	.  reduce 34 (src line 277)
+	.  reduce 34 (src line 278)
 
 	timeconv  goto 112
 
 state 105
 	reltime:  NUMBER lvalue reltime.    (29)
 
-	.  reduce 29 (src line 233)
+	.  reduce 29 (src line 234)
 
 
 state 106
 	timeconv:  AS LVALUE.    (35)
 
-	.  reduce 35 (src line 281)
+	.  reduce 35 (src line 282)
 
 
 state 107
@@ -896,20 +896,20 @@ state 111
 
 	LIMIT  shift 73
 	STREAMLIMIT  shift 74
-	.  reduce 30 (src line 243)
+	.  reduce 30 (src line 244)
 
 	limit  goto 117
 
 state 112
 	dataClause:  DATA IN timeref COMMA timeref limit timeconv.    (16)
 
-	.  reduce 16 (src line 139)
+	.  reduce 16 (src line 140)
 
 
 state 113
 	limit:  LIMIT NUMBER STREAMLIMIT NUMBER.    (33)
 
-	.  reduce 33 (src line 263)
+	.  reduce 33 (src line 264)
 
 
 state 114
@@ -948,7 +948,7 @@ state 117
 	timeconv: .    (34)
 
 	AS  shift 94
-	.  reduce 34 (src line 277)
+	.  reduce 34 (src line 278)
 
 	timeconv  goto 121
 
@@ -981,7 +981,7 @@ state 120
 state 121
 	dataClause:  DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (15)
 
-	.  reduce 15 (src line 135)
+	.  reduce 15 (src line 136)
 
 
 state 122
@@ -1047,7 +1047,7 @@ state 128
 
 	LIMIT  shift 73
 	STREAMLIMIT  shift 74
-	.  reduce 30 (src line 243)
+	.  reduce 30 (src line 244)
 
 	limit  goto 131
 
@@ -1057,7 +1057,7 @@ state 129
 
 	LIMIT  shift 73
 	STREAMLIMIT  shift 74
-	.  reduce 30 (src line 243)
+	.  reduce 30 (src line 244)
 
 	limit  goto 132
 
@@ -1073,7 +1073,7 @@ state 131
 	timeconv: .    (34)
 
 	AS  shift 94
-	.  reduce 34 (src line 277)
+	.  reduce 34 (src line 278)
 
 	timeconv  goto 134
 
@@ -1082,7 +1082,7 @@ state 132
 	timeconv: .    (34)
 
 	AS  shift 94
-	.  reduce 34 (src line 277)
+	.  reduce 34 (src line 278)
 
 	timeconv  goto 135
 
@@ -1092,20 +1092,20 @@ state 133
 
 	LIMIT  shift 73
 	STREAMLIMIT  shift 74
-	.  reduce 30 (src line 243)
+	.  reduce 30 (src line 244)
 
 	limit  goto 136
 
 state 134
 	dataClause:  STATISTICAL LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (17)
 
-	.  reduce 17 (src line 143)
+	.  reduce 17 (src line 144)
 
 
 state 135
 	dataClause:  STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (18)
 
-	.  reduce 18 (src line 151)
+	.  reduce 18 (src line 152)
 
 
 state 136
@@ -1113,14 +1113,14 @@ state 136
 	timeconv: .    (34)
 
 	AS  shift 94
-	.  reduce 34 (src line 277)
+	.  reduce 34 (src line 278)
 
 	timeconv  goto 137
 
 state 137
 	dataClause:  WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv.    (19)
 
-	.  reduce 19 (src line 159)
+	.  reduce 19 (src line 160)
 
 
 40 terminals, 17 nonterminals

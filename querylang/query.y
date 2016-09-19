@@ -4,6 +4,7 @@ package querylang
 
 import (
 	"bufio"
+    "strings"
 	"fmt"
 	"github.com/taylorchu/toki"
     "github.com/gtfierro/durandal/common"
@@ -303,7 +304,7 @@ whereTerm : lvalue LIKE qstring
                 if key == "uuid" {
 				  $$ = common.Dict{"uuid": common.Dict{"$regex": $3}}
                 } else {
-				  $$ = common.Dict{"$and": []common.Dict{{"key": key}, {"value": common.Dict{"$regex": $3}}}}
+				  $$ = common.Dict{"key": key,"value": common.Dict{"$regex": $3}}
                 }
 			}
 		  | lvalue EQ qstring
@@ -312,7 +313,7 @@ whereTerm : lvalue LIKE qstring
                 if key == "uuid" {
 				  $$ = common.Dict{"uuid": $3}
                 } else {
-				  $$ = common.Dict{"$and": []common.Dict{{"key": key}, {"value":  $3}}}
+				  $$ = common.Dict{"key": key, "value":  $3}
                 }
 			}
           | lvalue EQ NUMBER
@@ -321,16 +322,16 @@ whereTerm : lvalue LIKE qstring
                 if key == "uuid" {
 				  $$ = common.Dict{"uuid": $3}
                 } else {
-				  $$ = common.Dict{"$and": []common.Dict{{"key": key}, {"value":  $3}}}
+				  $$ = common.Dict{"key": key, "value":  $3}
                 }
             }
 		  | lvalue NEQ qstring
 			{
                 key := fixMongoKey($1)
                 if key == "uuid" {
-				  $$ = common.Dict{"$and": []common.Dict{{"uuid": common.Dict{"$neq": $3}}}}
+				  $$ = common.Dict{"uuid": common.Dict{"$neq": $3}}
                 } else {
-				  $$ = common.Dict{"$and": []common.Dict{{"key": key}, {"value": common.Dict{"$neq": $3}}}}
+				  $$ = common.Dict{"key": key,"value": common.Dict{"$neq": $3}}
                 }
 			}
 		  | HAS lvalue
@@ -373,7 +374,8 @@ whereTerm : lvalue LIKE qstring
 
 qstring   : QSTRING
           {
-            $$ = $1[1:len($1)-1]
+            $$ = strings.Trim($1,"\"")
+            //$$ = $1[1:len($1)-1]
           }
           ;
 
