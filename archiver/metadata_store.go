@@ -201,16 +201,18 @@ func (m *mongoStore) GetUUIDs(VK string, where common.Dict) ([]common.UUID, erro
 	return uuids, nil
 }
 
-func (m *mongoStore) GetDistinct(VK string, tag string, where common.Dict) (*common.MetadataGroup, error) {
-	//var (
-	//	whereClause bson.M
-	//	distincts   []string
-	//)
-	//if len(where) != 0 {
-	//	whereClause = where.ToBSON()
-	//}
-	//err := m.metadata.Find(whereClause).Distinct(tag, &distincts)
-	return nil, nil
+func (m *mongoStore) GetDistinct(VK string, tag string, where common.Dict) ([]string, error) {
+	var (
+		whereClause bson.M
+		distincts   []string
+	)
+	if len(where) != 0 {
+		whereClause = where.ToBSON()
+	}
+	if err := m.metadata.Find(whereClause).Distinct(tag, &distincts); err != nil {
+		return nil, errors.Wrap(err, "Could not get the thing")
+	}
+	return distincts, nil
 }
 
 func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
@@ -222,13 +224,13 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		// need to "duplicate" each record by each of the streams it belongs to
 		stripped := StripBangMeta(rec.SrcURI)
 		uuids, err := m.pfx.GetUUIDsFromURI(stripped)
-		log.Warning("GOT UUIDS", uuids)
+		//log.Warning("GOT UUIDS", uuids)
 		if err != nil {
 			return err
 		}
 		for _, u := range uuids {
 			rec.UUID = u
-			log.Debugf("Inserting %+v", rec)
+			//log.Debugf("Inserting %+v", rec)
 			if _, err := m.metadata.Upsert(bson.M{"Key": rec.Key, "SrcURI": rec.SrcURI, "UUID": rec.UUID}, rec); !mgo.IsDup(err) {
 				return err
 			}

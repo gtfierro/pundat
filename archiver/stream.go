@@ -34,7 +34,6 @@ type Stream struct {
 	// following fields used for operation of the stream
 	cancel       chan bool
 	subscription chan *bw2.SimpleMessage
-	//TODO: add database reference for timeseries
 }
 
 func (s *Stream) URI() string {
@@ -93,24 +92,6 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					log.Error(errors.Wrap(err, "Could not save mapping of uri to uuid"))
 					continue
 				}
-				//if s.inheritMetadata {
-				//	for _, uri := range GetURIPrefixes(msg.URI) {
-				//		log.Debugf("map URI %s to UUID %s", uri+"/!meta/+", currentUUID.String())
-				//		//if err := pfx.AddUUIDURIMapping(uri, currentUUID); err != nil {
-				//		//	log.Error(errors.Wrap(err, "Could not save mapping of uri to uuid"))
-				//		//	continue
-				//		//}
-				//	}
-				//}
-				//for _, uri := range s.metadataURIs {
-				//	log.Debugf("map URI %s to UUID %s", uri+"/!meta/+", currentUUID.String())
-				//	if err := pfx.AddUUIDURIMapping(uri, currentUUID); err != nil {
-				//		log.Error(errors.Wrap(err, "Could not save mapping of uri to uuid"))
-				//		continue
-				//	}
-				//}
-
-				//log.Noticef("UUID: %v, Value: %v, time %v", s.UUID, value, time)
 
 				// generate the timeseries values from our extracted value, and then save it
 				// test if the value is a list

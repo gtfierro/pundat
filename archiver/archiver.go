@@ -68,8 +68,6 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.bw = bw2.ConnectOrExit(c.BOSSWAVE.Address)
 	a.bw.OverrideAutoChainTo(true)
 	a.vk = a.bw.SetEntityFileOrExit(c.BOSSWAVE.Entityfile)
-	//a.svc = a.bw.RegisterService(a.namespace, "s.giles")
-	//a.iface = a.svc.RegisterInterface("0", "i.archiver")
 
 	// setup dot master
 	a.DM = NewDotMaster(a.bw, c.Archiver.BlockExpiry)
@@ -79,10 +77,8 @@ func NewArchiver(c *Config) (a *Archiver) {
 	// setup view manager
 	a.vm = newViewManager(a.bw, a.MD, a.TS, a.pfx, a.ms)
 
-	// TODO: listen for queries
 	a.qp = querylang.NewQueryProcessor()
 
-	// TODO: create the View to listen for the archive requests
 	a.svc = a.bw.RegisterService(c.BOSSWAVE.DeployNS, "s.giles")
 	a.iface = a.svc.RegisterInterface("_", "i.archiver")
 	queryChan, err := a.bw.Subscribe(&bw2.SubscribeParams{
@@ -176,7 +172,10 @@ func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGrou
 	switch parsed.QueryType {
 	case querylang.SELECT_TYPE:
 		if parsed.Distinct {
-			err = fmt.Errorf("DISTINCT not implemented yet sorry")
+			var results []string
+			params := parsed.GetParams().(*common.DistinctParams)
+			results, err = a.DistinctTag(vk, params)
+			log.Debug("DISTINCT", results)
 			return
 		}
 		params := parsed.GetParams().(*common.TagParams)
@@ -184,6 +183,7 @@ func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGrou
 		return
 	case querylang.DATA_TYPE:
 		params := parsed.GetParams().(*common.DataParams)
+		log.Warning(params)
 		if params.IsStatistical || params.IsWindow {
 			statsResult, err = a.SelectStatisticalData(params)
 			return

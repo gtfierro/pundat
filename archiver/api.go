@@ -8,7 +8,7 @@ func (a *Archiver) SelectTags(vk string, params *common.TagParams) ([]common.Met
 	return a.MD.GetMetadata(vk, params.Tags, params.Where)
 }
 
-func (a *Archiver) DistinctTag(vk string, params *common.DistinctParams) (*common.MetadataGroup, error) {
+func (a *Archiver) DistinctTag(vk string, params *common.DistinctParams) ([]string, error) {
 	return a.MD.GetDistinct(vk, params.Tag, params.Where)
 }
 
