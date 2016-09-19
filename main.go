@@ -16,7 +16,7 @@ var log *logging.Logger
 
 func init() {
 	log = logging.MustGetLogger("durandal")
-	var format = "%{color}%{level} %{time:Jan 02 15:04:05} %{color:reset} ▶ %{message}"
+	var format = "%{color}%{level} %{shortfile} %{time:Jan 02 15:04:05} %{color:reset} ▶ %{message}"
 	var logBackend = logging.NewLogBackend(os.Stderr, "", 0)
 	logBackendLeveled := logging.AddModuleLevel(logBackend)
 	logging.SetBackend(logBackendLeveled)
