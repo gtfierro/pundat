@@ -84,7 +84,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 
 	// TODO: create the View to listen for the archive requests
 	a.svc = a.bw.RegisterService(c.BOSSWAVE.DeployNS, "s.giles")
-	a.iface = a.svc.RegisterInterface("0", "i.archiver")
+	a.iface = a.svc.RegisterInterface("_", "i.archiver")
 	queryChan, err := a.bw.Subscribe(&bw2.SubscribeParams{
 		URI: a.iface.SlotURI("query"),
 	})
@@ -134,7 +134,7 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 	signalURI = fmt.Sprintf("%s,queries", fromVK[:len(fromVK)-1])
 
 	log.Infof("Got query %+v", query)
-	mdRes, tsRes, err := a.HandleQuery(fromVK, query.Query)
+	mdRes, tsRes, statsRes, err := a.HandleQuery(fromVK, query.Query)
 	if err != nil {
 		msg := QueryError{
 			Query: query.Query,
@@ -152,10 +152,11 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 
 	log.Infof("Got Metadata %+v", mdRes)
 	log.Infof("Got Timeseries %+v", tsRes)
+	log.Infof("Got Statistics %+v", statsRes)
 	metadataPayload := POsFromMetadataGroup(query.Nonce, mdRes)
 	reply = append(reply, metadataPayload)
 
-	timeseriesPayload := POsFromTimeseriesGroup(query.Nonce, tsRes)
+	timeseriesPayload := POsFromTimeseriesGroup(query.Nonce, tsRes, statsRes)
 	reply = append(reply, timeseriesPayload)
 
 	log.Debugf("Reply on %s: %d", a.iface.SignalURI(signalURI), len(reply))
@@ -165,7 +166,7 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 	}
 }
 
-func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGroup, tsResult []common.Timeseries, err error) {
+func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGroup, tsResult []common.Timeseries, statsResult []common.StatisticTimeseries, err error) {
 	parsed := a.qp.Parse(query)
 	if parsed.Err != nil {
 		err = fmt.Errorf("Error (%v) in query \"%v\" (error at %v)\n", parsed.Err, query, parsed.ErrPos)
@@ -183,30 +184,22 @@ func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGrou
 		return
 	case querylang.DATA_TYPE:
 		params := parsed.GetParams().(*common.DataParams)
-		//if params.IsStatistical || params.IsWindow {
-		//	return a.SelectStatisticalData(params)
-		//}
+		if params.IsStatistical || params.IsWindow {
+			statsResult, err = a.SelectStatisticalData(params)
+			return
+		}
 		switch parsed.Data.Dtype {
 		case querylang.IN_TYPE:
-			log.Warning("SELECT DATA RANGE", params)
 			tsResult, err = a.SelectDataRange(params)
 			return
 		case querylang.BEFORE_TYPE:
-			log.Warning("SELECT DATA BEFORE", params)
 			tsResult, err = a.SelectDataBefore(params)
 			return
-			//case querylang.AFTER_TYPE:
-			//	return a.SelectDataAfter(params)
+		case querylang.AFTER_TYPE:
+			tsResult, err = a.SelectDataAfter(params)
+			return
 		}
 	}
 
 	return
 }
-
-//func (a *Archiver) SelectTags(params *common.TagParams) (QueryResult, error) {
-//func (a *Archiver) DistinctTag(params *common.DistinctParams) (QueryResult, error) {
-//func (a *Archiver) SelectDataRange(params *common.DataParams) (common.SmapMessageList, error) {
-//func (a *Archiver) SelectDataBefore(params *common.DataParams) (result common.SmapMessageList, err error) {
-//func (a *Archiver) SelectDataAfter(params *common.DataParams) (result common.SmapMessageList, err error) {
-//func (a *Archiver) SelectStatisticalData(params *common.DataParams) (result common.SmapMessageList, err error) {
-//func (a *Archiver) DeleteData(params *common.DataParams) (err error) {

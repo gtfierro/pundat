@@ -26,12 +26,13 @@ func POsFromMetadataGroup(nonce uint32, groups []common.MetadataGroup) bw2.Paylo
 	return mdRes.ToMsgPackBW()
 }
 
-func POsFromTimeseriesGroup(nonce uint32, groups []common.Timeseries) bw2.PayloadObject {
+func POsFromTimeseriesGroup(nonce uint32, tsGroups []common.Timeseries, statsGroups []common.StatisticTimeseries) bw2.PayloadObject {
 	tsRes := QueryTimeseriesResult{
 		Nonce: nonce,
 		Data:  []Timeseries{},
+		Stats: []Statistics{},
 	}
-	for _, group := range groups {
+	for _, group := range tsGroups {
 		ts := Timeseries{
 			UUID:   group.UUID.String(),
 			Path:   group.SrcURI,
@@ -43,6 +44,24 @@ func POsFromTimeseriesGroup(nonce uint32, groups []common.Timeseries) bw2.Payloa
 			ts.Values = append(ts.Values, rdg.Value)
 		}
 		tsRes.Data = append(tsRes.Data, ts)
+	}
+	for _, group := range statsGroups {
+		ts := Statistics{
+			UUID:  group.UUID.String(),
+			Times: []uint64{},
+			Count: []uint64{},
+			Min:   []float64{},
+			Mean:  []float64{},
+			Max:   []float64{},
+		}
+		for _, rdg := range group.Records {
+			ts.Times = append(ts.Times, uint64(rdg.Time.UnixNano()))
+			ts.Count = append(ts.Count, rdg.Count)
+			ts.Min = append(ts.Min, rdg.Min)
+			ts.Mean = append(ts.Mean, rdg.Mean)
+			ts.Max = append(ts.Max, rdg.Max)
+		}
+		tsRes.Stats = append(tsRes.Stats, ts)
 	}
 	return tsRes.ToMsgPackBW()
 }

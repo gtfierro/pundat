@@ -45,41 +45,38 @@ func (a *Archiver) SelectDataBefore(params *common.DataParams) (result []common.
 	if err = a.prepareDataParams(params); err != nil {
 		return
 	}
-	log.Warning("PARAMS", params)
 	result, err = a.TS.Prev(params.UUIDs, params.Begin)
 	result = a.packResults(params, result)
 	return
 }
 
-//
-//// selects the data point most immediately after the Start parameter for all matching streams
-//func (a *Archiver) SelectDataAfter(params *common.DataParams) (result common.SmapMessageList, err error) {
-//	var readings []common.SmapNumbersResponse
-//	if err = a.prepareDataParams(params); err != nil {
-//		return
-//	}
-//	readings, err = a.TS.Next(params.UUIDs, params.Begin)
-//	result = a.packResults(params, readings)
-//	return
-//}
-//
-//func (a *Archiver) SelectStatisticalData(params *common.DataParams) (result common.SmapMessageList, err error) {
-//	var readings []common.StatisticalNumbersResponse
-//	if err = a.prepareDataParams(params); err != nil {
-//		return
-//	}
-//	// switch order so its consistent
-//	if params.End < params.Begin {
-//		params.Begin, params.End = params.End, params.Begin
-//	}
-//	if params.IsStatistical {
-//		readings, err = a.TS.StatisticalData(params.UUIDs, params.PointWidth, params.Begin, params.End)
-//	} else if params.IsWindow {
-//		readings, err = a.TS.WindowData(params.UUIDs, params.Width, params.Begin, params.End)
-//	}
-//	result = a.packStatsResults(params, readings)
-//	return
-//}
+// selects the data point most immediately after the Start parameter for all matching streams
+func (a *Archiver) SelectDataAfter(params *common.DataParams) (result []common.Timeseries, err error) {
+	if err = a.prepareDataParams(params); err != nil {
+		return
+	}
+	result, err = a.TS.Next(params.UUIDs, params.Begin)
+	result = a.packResults(params, result)
+	return
+}
+
+func (a *Archiver) SelectStatisticalData(params *common.DataParams) (result []common.StatisticTimeseries, err error) {
+	if err = a.prepareDataParams(params); err != nil {
+		return
+	}
+	// switch order so its consistent
+	if params.End < params.Begin {
+		params.Begin, params.End = params.End, params.Begin
+	}
+	if params.IsStatistical {
+		result, err = a.TS.StatisticalData(params.UUIDs, params.PointWidth, params.Begin, params.End)
+	} else if params.IsWindow {
+		result, err = a.TS.WindowData(params.UUIDs, params.Width, params.Begin, params.End)
+	}
+	result = a.packStatsResults(params, result)
+	return
+}
+
 //
 //func (a *Archiver) DeleteData(params *common.DataParams) (err error) {
 //	if err = a.prepareDataParams(params); err != nil {
@@ -100,8 +97,6 @@ func (a *Archiver) prepareDataParams(params *common.DataParams) (err error) {
 			return err
 		}
 	}
-
-	log.Debug("UUIDS", params.UUIDs, params.Where)
 
 	// apply the streamlimit if it exists
 	if params.StreamLimit > 0 && len(params.UUIDs) > params.StreamLimit {
@@ -140,22 +135,17 @@ func (a *Archiver) packResults(params *common.DataParams, readings []common.Time
 	return readings
 }
 
-//func (a *Archiver) packStatsResults(params *common.DataParams, readings []common.StatisticalNumbersResponse) common.SmapMessageList {
-//	var result = common.SmapMessageList{}
-//	for _, resp := range readings {
-//		if len(resp.Readings) > 0 {
-//			msg := &common.SmapMessage{UUID: resp.UUID}
-//			for _, rdg := range resp.Readings {
-//				rdg.ConvertTime(common.UnitOfTime(params.ConvertToUnit))
-//				msg.Readings = append(msg.Readings, rdg)
-//			}
-//			// apply data limit if exists
-//			if params.DataLimit > 0 && len(msg.Readings) > params.DataLimit {
-//				msg.Readings = msg.Readings[:params.DataLimit]
-//			}
-//			result = append(result, msg)
-//		}
-//	}
-//	log.Debugf("Returning %d readings", len(result))
-//	return result
-//}
+func (a *Archiver) packStatsResults(params *common.DataParams, readings []common.StatisticTimeseries) []common.StatisticTimeseries {
+	for i, resp := range readings {
+		resp.Lock()
+		if len(resp.Records) > 0 {
+			// apply data limit if exists
+			if params.DataLimit > 0 && len(resp.Records) > params.DataLimit {
+				resp.Records = resp.Records[:params.DataLimit]
+			}
+			readings[i] = resp
+		}
+	}
+	log.Debugf("Returning %d readings", len(readings))
+	return readings
+}
