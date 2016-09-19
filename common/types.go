@@ -7,7 +7,7 @@ import (
 type Dict map[string]interface{}
 
 func (d Dict) ToBSON() bson.M {
-	var ret bson.M
+	var ret = make(bson.M)
 	for k, v := range d {
 		switch t := v.(type) {
 		case string, int:

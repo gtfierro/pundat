@@ -2,9 +2,12 @@ package common
 
 import (
 	bw2 "gopkg.in/immesys/bw2bind.v5"
+	"gopkg.in/mgo.v2/bson"
 	"sync"
 	"time"
 )
+
+var timeFormat = "2006-1-2 15:04:05.000000000 -0700 MST"
 
 // not associated with a UUID (durandal-specific). Needs
 // to be included in a MetadataGroup to make that association.
@@ -13,6 +16,8 @@ type MetadataRecord struct {
 	Value     interface{}
 	SrcURI    string
 	TimeValid time.Time
+	// used for retrieving records
+	UUID UUID
 }
 
 func RecordFromMessage(msg *bw2.SimpleMessage) *MetadataRecord {
@@ -27,6 +32,17 @@ func RecordFromMessage(msg *bw2.SimpleMessage) *MetadataRecord {
 		}
 	}
 	return nil
+}
+
+func RecordFromBson(doc bson.M) *MetadataRecord {
+	rec := &MetadataRecord{Key: doc["key"].(string), Value: doc["value"].(string), SrcURI: doc["srcuri"].(string), UUID: ParseUUID(doc["uuid"].(string))}
+	t, ok := doc["timevalid"].(time.Time)
+	if !ok {
+		rec.TimeValid = time.Unix(0, 0)
+	} else {
+		rec.TimeValid = t
+	}
+	return rec
 }
 
 type MetadataGroup struct {
