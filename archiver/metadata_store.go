@@ -145,17 +145,12 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 	if len(where) != 0 {
 		whereClause = where.ToBSON()
 	}
-	staged := m.metadata.Find(whereClause)
-	log.Warning(whereClause)
 	selectTags := bson.M{"_id": 0}
-	if len(tags) != 0 {
-		for _, tag := range tags {
-			selectTags[tag] = 1
-		}
-	}
-	if err := staged.Select(selectTags).All(&_results); err != nil {
+	log.Warning("WHERE", where, whereClause, selectTags)
+	if err := m.metadata.Find(whereClause).Select(selectTags).All(&_results); err != nil {
 		return nil, errors.Wrap(err, "Could not select tags")
 	}
+	log.Warning(_results)
 
 	// serialize results and return
 	var (
@@ -170,7 +165,15 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 			group = common.NewEmptyMetadataGroup()
 			group.UUID = record.UUID
 		}
-		group.AddRecord(record)
+		if len(tags) > 0 {
+			for _, tag := range tags {
+				if record.Key == tag {
+					group.AddRecord(record)
+				}
+			}
+		} else {
+			group.AddRecord(record)
+		}
 		grouping[record.UUID.String()] = group
 	}
 	for _, group := range grouping {
