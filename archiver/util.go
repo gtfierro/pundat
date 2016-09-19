@@ -203,3 +203,12 @@ func GetURIPrefixes(uri string) []string {
 	}
 	return prefixes
 }
+
+// Strip suffixes starting with "!meta" e.g. "/!meta/abcwhatever"
+func StripBangMeta(uri string) string {
+	idx := strings.Index(uri, "/!meta")
+	if idx > 0 {
+		return uri[:idx]
+	}
+	return uri
+}
