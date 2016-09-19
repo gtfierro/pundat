@@ -116,7 +116,7 @@ const sqEofCode = 1
 const sqErrCode = 2
 const sqInitialStackSize = 16
 
-//line query.y:369
+//line query.y:409
 
 const eof = 0
 
@@ -1005,59 +1005,99 @@ sqdefault:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
 		//line query.y:301
 		{
-			sqVAL.dict = common.Dict{fixMongoKey(sqDollar[1].str): common.Dict{"$regex": sqDollar[3].str}}
+			key := fixMongoKey(sqDollar[1].str)
+			if key == "uuid" {
+				sqVAL.dict = common.Dict{"uuid": common.Dict{"$regex": sqDollar[3].str}}
+			} else {
+				sqVAL.dict = common.Dict{"$and": []common.Dict{{"key": key}, {"value": common.Dict{"$regex": sqDollar[3].str}}}}
+			}
 		}
 	case 38:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:305
+		//line query.y:310
 		{
-			sqVAL.dict = common.Dict{fixMongoKey(sqDollar[1].str): sqDollar[3].str}
+			key := fixMongoKey(sqDollar[1].str)
+			if key == "uuid" {
+				sqVAL.dict = common.Dict{"uuid": sqDollar[3].str}
+			} else {
+				sqVAL.dict = common.Dict{"$and": []common.Dict{{"key": key}, {"value": sqDollar[3].str}}}
+			}
 		}
 	case 39:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:309
+		//line query.y:319
 		{
-			sqVAL.dict = common.Dict{fixMongoKey(sqDollar[1].str): sqDollar[3].str}
+			key := fixMongoKey(sqDollar[1].str)
+			if key == "uuid" {
+				sqVAL.dict = common.Dict{"uuid": sqDollar[3].str}
+			} else {
+				sqVAL.dict = common.Dict{"$and": []common.Dict{{"key": key}, {"value": sqDollar[3].str}}}
+			}
 		}
 	case 40:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:313
+		//line query.y:328
 		{
-			sqVAL.dict = common.Dict{fixMongoKey(sqDollar[1].str): common.Dict{"$neq": sqDollar[3].str}}
+			key := fixMongoKey(sqDollar[1].str)
+			if key == "uuid" {
+				sqVAL.dict = common.Dict{"$and": []common.Dict{{"uuid": common.Dict{"$neq": sqDollar[3].str}}}}
+			} else {
+				sqVAL.dict = common.Dict{"$and": []common.Dict{{"key": key}, {"value": common.Dict{"$neq": sqDollar[3].str}}}}
+			}
 		}
 	case 41:
 		sqDollar = sqS[sqpt-2 : sqpt+1]
-		//line query.y:317
+		//line query.y:337
 		{
-			sqVAL.dict = common.Dict{fixMongoKey(sqDollar[2].str): common.Dict{"$exists": true}}
+			key := fixMongoKey(sqDollar[2].str)
+			if key == "uuid" {
+				sqVAL.dict = common.Dict{"uuid": common.Dict{"$exists": true}}
+			} else {
+				sqVAL.dict = common.Dict{"key": key}
+			}
+			//$$ = common.Dict{"$and": []common.Dict{{"key": fixMongoKey($2)}}}
+			//$$ = common.Dict{fixMongoKey($2): common.Dict{"$exists": true}}
 		}
 	case 42:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:321
+		//line query.y:348
 		{
-			sqVAL.dict = common.Dict{fixMongoKey(sqDollar[3].str): common.Dict{"$in": sqDollar[1].list}}
+			key := fixMongoKey(sqDollar[3].str)
+			if key == "uuid" {
+				sqVAL.dict = common.Dict{"uuid": common.Dict{"$in": sqDollar[1].list}}
+			} else {
+				sqVAL.dict = common.Dict{"$and": []common.Dict{{"key": fixMongoKey(sqDollar[3].str)}, {"value": common.Dict{"$in": sqDollar[1].list}}}}
+			}
+			//$$ = common.Dict{fixMongoKey($3): common.Dict{"$in": $1}}
 		}
 	case 43:
 		sqDollar = sqS[sqpt-4 : sqpt+1]
-		//line query.y:325
+		//line query.y:358
 		{
-			sqVAL.dict = common.Dict{fixMongoKey(sqDollar[3].str): common.Dict{"$not": common.Dict{"$in": sqDollar[1].list}}}
+			key := fixMongoKey(sqDollar[3].str)
+			if key == "uuid" {
+				sqVAL.dict = common.Dict{"uuid": common.Dict{"$in": sqDollar[1].list}}
+			} else {
+				sqVAL.dict = common.Dict{"$and": []common.Dict{{"key": fixMongoKey(sqDollar[3].str)}, {"$not": common.Dict{"value": common.Dict{"$in": sqDollar[1].list}}}}}
+			}
+			//$$ = common.Dict{"$and": []common.Dict{{"key": fixMongoKey($3)}, {"$not": common.Dict{"value": common.Dict{"$in": $1}}}}}
+			//$$ = common.Dict{fixMongoKey($3): common.Dict{"$not": common.Dict{"$in": $1}}}
 		}
 	case 44:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:329
+		//line query.y:369
 		{
 			sqVAL.dict = sqDollar[2].dict
 		}
 	case 45:
 		sqDollar = sqS[sqpt-1 : sqpt+1]
-		//line query.y:335
+		//line query.y:375
 		{
 			sqVAL.str = sqDollar[1].str[1 : len(sqDollar[1].str)-1]
 		}
 	case 46:
 		sqDollar = sqS[sqpt-1 : sqpt+1]
-		//line query.y:341
+		//line query.y:381
 		{
 
 			sqlex.(*sqLex)._keys[sqDollar[1].str] = struct{}{}
@@ -1065,19 +1105,19 @@ sqdefault:
 		}
 	case 47:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:349
+		//line query.y:389
 		{
 			sqVAL.dict = common.Dict{"$and": []common.Dict{sqDollar[1].dict, sqDollar[3].dict}}
 		}
 	case 48:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:353
+		//line query.y:393
 		{
 			sqVAL.dict = common.Dict{"$or": []common.Dict{sqDollar[1].dict, sqDollar[3].dict}}
 		}
 	case 49:
 		sqDollar = sqS[sqpt-2 : sqpt+1]
-		//line query.y:357
+		//line query.y:397
 		{
 			tmp := make(common.Dict)
 			for k, v := range sqDollar[2].dict {
@@ -1087,7 +1127,7 @@ sqdefault:
 		}
 	case 50:
 		sqDollar = sqS[sqpt-1 : sqpt+1]
-		//line query.y:365
+		//line query.y:405
 		{
 			sqVAL.dict = sqDollar[1].dict
 		}
