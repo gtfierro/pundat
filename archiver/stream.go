@@ -41,10 +41,6 @@ func (s *Stream) URI() string {
 }
 
 func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore MetadataStore, pfx *prefix.PrefixStore) {
-	ts := common.Timeseries{
-	//UUID:   s.UUID,
-	//SrcURI: s.uri,
-	}
 	//TODO: Consider batching delivering new readings to BtrDB
 	// Right now we deliver readings one by one to BtrDB. If the serialization becomes
 	// a bottleneck, we should batch readings to amortize that cost
@@ -81,6 +77,10 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					// generate the UUID for this message's URI, POnum and value expression (and the name, when we have it)
 					//TODO: add a name to the UUID
 					currentUUID = common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, msg.URI+po.GetPODotNum()+s.valueString).String())
+				}
+				ts := common.Timeseries{
+					UUID:   currentUUID,
+					SrcURI: msg.URI,
 				}
 
 				// map the metadata URIs for this particular URI to the generated UUID

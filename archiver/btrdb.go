@@ -100,7 +100,7 @@ func (bdb *btrIface) queryNearestValue(uuids []common.UUID, start uint64, backwa
 	var results []chan btrdb.StandardValue
 	client := bdb.getClient()
 	for _, uu := range uuids {
-		uuid := uuidlib.Parse(string(uu))
+		uuid := uuidlib.UUID(uu)
 		values, _, _, err := client.QueryNearestValue(uuid, int64(start), backwards, 0)
 		if err != nil {
 			return ret, err
@@ -128,7 +128,7 @@ func (bdb *btrIface) GetData(uuids []common.UUID, start, end uint64) ([]common.T
 	var results []chan btrdb.StandardValue
 	client := bdb.getClient()
 	for _, uu := range uuids {
-		uuid := uuidlib.Parse(string(uu))
+		uuid := uuidlib.UUID(uu)
 		values, _, _, err := client.QueryStandardValues(uuid, int64(start), int64(end), 0)
 		if err != nil {
 			return ret, err
