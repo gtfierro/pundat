@@ -130,7 +130,7 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 	signalURI = fmt.Sprintf("%s,queries", fromVK[:len(fromVK)-1])
 
 	log.Infof("Got query %+v", query)
-	mdRes, tsRes, statsRes, err := a.HandleQuery(fromVK, query.Query)
+	mdRes, tsRes, statsRes, changedRes, err := a.HandleQuery(fromVK, query.Query)
 	if err != nil {
 		msg := QueryError{
 			Query: query.Query,
@@ -149,11 +149,15 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 	log.Infof("Got Metadata %+v", mdRes)
 	log.Infof("Got Timeseries %+v", tsRes)
 	log.Infof("Got Statistics %+v", statsRes)
+	log.Infof("Got Changed %+v", changedRes)
 	metadataPayload := POsFromMetadataGroup(query.Nonce, mdRes)
 	reply = append(reply, metadataPayload)
 
 	timeseriesPayload := POsFromTimeseriesGroup(query.Nonce, tsRes, statsRes)
 	reply = append(reply, timeseriesPayload)
+
+	changedPayload := POsFromChangedGroup(query.Nonce, changedRes)
+	reply = append(reply, changedPayload)
 
 	log.Debugf("Reply on %s: %d", a.iface.SignalURI(signalURI), len(reply))
 
@@ -162,7 +166,7 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 	}
 }
 
-func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGroup, tsResult []common.Timeseries, statsResult []common.StatisticTimeseries, err error) {
+func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGroup, tsResult []common.Timeseries, statsResult []common.StatisticTimeseries, changedResult []common.ChangedRange, err error) {
 	parsed := a.qp.Parse(query)
 	if parsed.Err != nil {
 		err = fmt.Errorf("Error (%v) in query \"%v\" (error at %v)\n", parsed.Err, query, parsed.ErrPos)
@@ -183,9 +187,12 @@ func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGrou
 		return
 	case querylang.DATA_TYPE:
 		params := parsed.GetParams().(*common.DataParams)
-		log.Warning(params)
 		if params.IsStatistical || params.IsWindow {
 			statsResult, err = a.SelectStatisticalData(params)
+			return
+		}
+		if params.IsChangedRanges {
+			changedResult, err = a.GetChangedRanges(params)
 			return
 		}
 		switch parsed.Data.Dtype {

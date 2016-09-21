@@ -13,7 +13,7 @@ type MetadataStore interface {
 	SaveMetadata(records []*common.MetadataRecord) error
 
 	RemoveMetadata(VK string, tags []string, where common.Dict) error
-	MapURItoUUID(uri, ponum, valueExpr string, uuid common.UUID) error
+	MapURItoUUID(uri string, uuid common.UUID) error
 	URItoUUID(uri string) (common.UUID, error)
 }
 
@@ -36,6 +36,9 @@ type TimeseriesStore interface {
 
 	// width in nanoseconds
 	WindowData(uuids []common.UUID, width, start, end uint64) ([]common.StatisticTimeseries, error)
+
+	// https://godoc.org/gopkg.in/btrdb.v3#BTrDBConnection.QueryChangedRanges
+	ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64, resolution uint8) ([]common.ChangedRange, error)
 
 	// delete data
 	DeleteData(uuids []common.UUID, start uint64, end uint64) error

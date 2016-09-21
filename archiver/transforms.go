@@ -34,10 +34,11 @@ func POsFromTimeseriesGroup(nonce uint32, tsGroups []common.Timeseries, statsGro
 	}
 	for _, group := range tsGroups {
 		ts := Timeseries{
-			UUID:   group.UUID.String(),
-			Path:   group.SrcURI,
-			Times:  []uint64{},
-			Values: []float64{},
+			UUID:       group.UUID.String(),
+			Path:       group.SrcURI,
+			Generation: group.Generation,
+			Times:      []uint64{},
+			Values:     []float64{},
 		}
 		for _, rdg := range group.Records {
 			ts.Times = append(ts.Times, uint64(rdg.Time.UnixNano()))
@@ -47,12 +48,13 @@ func POsFromTimeseriesGroup(nonce uint32, tsGroups []common.Timeseries, statsGro
 	}
 	for _, group := range statsGroups {
 		ts := Statistics{
-			UUID:  group.UUID.String(),
-			Times: []uint64{},
-			Count: []uint64{},
-			Min:   []float64{},
-			Mean:  []float64{},
-			Max:   []float64{},
+			UUID:       group.UUID.String(),
+			Generation: group.Generation,
+			Times:      []uint64{},
+			Count:      []uint64{},
+			Min:        []float64{},
+			Mean:       []float64{},
+			Max:        []float64{},
 		}
 		for _, rdg := range group.Records {
 			ts.Times = append(ts.Times, uint64(rdg.Time.UnixNano()))
@@ -64,4 +66,23 @@ func POsFromTimeseriesGroup(nonce uint32, tsGroups []common.Timeseries, statsGro
 		tsRes.Stats = append(tsRes.Stats, ts)
 	}
 	return tsRes.ToMsgPackBW()
+}
+
+func POsFromChangedGroup(nonce uint32, groups []common.ChangedRange) bw2.PayloadObject {
+	crRes := QueryChangedResult{
+		Nonce:   nonce,
+		Changed: []ChangedRange{},
+	}
+	for _, group := range groups {
+		for _, rng := range group.Ranges {
+			cr := ChangedRange{
+				UUID:       group.UUID.String(),
+				StartTime:  rng.StartTime,
+				EndTime:    rng.EndTime,
+				Generation: rng.Generation,
+			}
+			crRes.Changed = append(crRes.Changed, cr)
+		}
+	}
+	return crRes.ToMsgPackBW()
 }

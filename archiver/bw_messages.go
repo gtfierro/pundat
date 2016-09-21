@@ -8,6 +8,10 @@ import (
 	"math"
 )
 
+const GilesQueryChangedRangesPIDString = "2.0.8.8"
+
+var GilesQueryChangedRangesPID = bw2.FromDotForm(GilesQueryChangedRangesPIDString)
+
 type KeyValueQuery struct {
 	Query string
 	Nonce uint32
@@ -66,6 +70,16 @@ func (msg QueryTimeseriesResult) Dump() string {
 	return res
 }
 
+type QueryChangedResult struct {
+	Nonce   uint32
+	Changed []ChangedRange
+}
+
+func (msg QueryChangedResult) ToMsgPackBW() (po bw2.PayloadObject) {
+	po, _ = bw2.CreateMsgPackPayloadObject(GilesQueryChangedRangesPID, msg)
+	return
+}
+
 type KeyValueMetadata struct {
 	UUID     string
 	Path     string
@@ -98,10 +112,11 @@ func (msg KeyValueMetadata) Dump() string {
 }
 
 type Timeseries struct {
-	UUID   string
-	Path   string
-	Times  []uint64
-	Values []float64
+	UUID       string
+	Path       string
+	Generation uint64
+	Times      []uint64
+	Values     []float64
 }
 
 func (msg Timeseries) ToMsgPackBW() (po bw2.PayloadObject) {
@@ -131,12 +146,13 @@ func (msg Timeseries) Dump() string {
 }
 
 type Statistics struct {
-	UUID  string
-	Times []uint64
-	Count []uint64
-	Min   []float64
-	Mean  []float64
-	Max   []float64
+	UUID       string
+	Generation uint64
+	Times      []uint64
+	Count      []uint64
+	Min        []float64
+	Mean       []float64
+	Max        []float64
 }
 
 func (msg Statistics) ToMsgPackBW() (po bw2.PayloadObject) {
@@ -151,6 +167,13 @@ func (msg Statistics) ToReadings() []common.Reading {
 		res[idx] = &common.StatisticalNumberReading{Time: msg.Times[idx], UoT: common.GuessTimeUnit(msg.Times[idx]), Count: msg.Count[idx], Min: msg.Min[idx], Max: msg.Max[idx], Mean: msg.Mean[idx]}
 	}
 	return res
+}
+
+type ChangedRange struct {
+	UUID       string
+	Generation uint64
+	StartTime  int64
+	EndTime    int64
 }
 
 type BWavable interface {

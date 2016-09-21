@@ -2,7 +2,6 @@ package archiver
 
 import (
 	"github.com/gtfierro/durandal/common"
-	"github.com/gtfierro/durandal/prefix"
 	"github.com/gtfierro/ob"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
@@ -40,7 +39,7 @@ func (s *Stream) URI() string {
 	return s.uri
 }
 
-func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore MetadataStore, pfx *prefix.PrefixStore) {
+func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
 	//TODO: Consider batching delivering new readings to BtrDB
 	// Right now we deliver readings one by one to BtrDB. If the serialization becomes
 	// a bottleneck, we should batch readings to amortize that cost
