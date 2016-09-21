@@ -35,7 +35,25 @@ func RecordFromMessage(msg *bw2.SimpleMessage) *MetadataRecord {
 }
 
 func RecordFromBson(doc bson.M) *MetadataRecord {
-	rec := &MetadataRecord{Key: doc["key"].(string), Value: doc["value"].(string), SrcURI: doc["srcuri"].(string), UUID: ParseUUID(doc["uuid"].(string))}
+	var (
+		key    string
+		value  string
+		srcuri string
+		uuid   string
+	)
+	if _key, found := doc["key"]; found {
+		key = _key.(string)
+	}
+	if _value, found := doc["value"]; found {
+		value = _value.(string)
+	}
+	if _srcuri, found := doc["srcuri"]; found {
+		srcuri = _srcuri.(string)
+	}
+	if _uuid, found := doc["uuid"]; found {
+		uuid = _uuid.(string)
+	}
+	rec := &MetadataRecord{Key: key, Value: value, SrcURI: srcuri, UUID: ParseUUID(uuid)}
 	t, ok := doc["timevalid"].(time.Time)
 	if !ok {
 		rec.TimeValid = time.Unix(0, 0)
@@ -89,6 +107,9 @@ func GroupFromMessage(msg *bw2.SimpleMessage) *MetadataGroup {
 }
 
 func (grp *MetadataGroup) AddRecord(rec *MetadataRecord) {
+	if rec.Key == "" {
+		return
+	}
 	grp.Lock()
 	grp.Records[rec.Key] = rec
 	grp.Unlock()
