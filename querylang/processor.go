@@ -93,16 +93,20 @@ func (parsed *ParsedQuery) GetParams() common.QueryParams {
 		}
 	case DATA_TYPE:
 		return &common.DataParams{
-			Where:         parsed.Where,
-			StreamLimit:   int(parsed.Data.Limit.Streamlimit),
-			DataLimit:     int(parsed.Data.Limit.Limit),
-			Begin:         uint64(parsed.Data.Start.UnixNano()),
-			End:           uint64(parsed.Data.End.UnixNano()),
-			ConvertToUnit: parsed.Data.Timeconv,
-			IsStatistical: parsed.Data.IsStatistical,
-			IsWindow:      parsed.Data.IsWindow,
-			Width:         parsed.Data.Width,
-			PointWidth:    int(parsed.Data.PointWidth),
+			Where:           parsed.Where,
+			StreamLimit:     int(parsed.Data.Limit.Streamlimit),
+			DataLimit:       int(parsed.Data.Limit.Limit),
+			Begin:           uint64(parsed.Data.Start.UnixNano()),
+			End:             uint64(parsed.Data.End.UnixNano()),
+			ConvertToUnit:   parsed.Data.Timeconv,
+			IsStatistical:   parsed.Data.IsStatistical,
+			IsWindow:        parsed.Data.IsWindow,
+			IsChangedRanges: parsed.Data.IsChangedRanges,
+			Width:           parsed.Data.Width,
+			PointWidth:      int(parsed.Data.PointWidth),
+			FromGen:         parsed.Data.FromGen,
+			ToGen:           parsed.Data.ToGen,
+			Resolution:      parsed.Data.Resolution,
 		}
 	default:
 		return nil
