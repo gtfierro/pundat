@@ -29,3 +29,93 @@ func TestGetURIPrefixes(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchIgnoreLastN(t *testing.T) {
+	for _, test := range []struct {
+		uri     string
+		prefix  string
+		n       int
+		matches bool
+	}{
+		{
+			"/a",
+			"/a",
+			0,
+			true,
+		},
+		{
+			"/a/b/signal/d",
+			"/a/b/signal/d/!meta/hello",
+			2,
+			true,
+		},
+		{
+			"/a/b/signal/d",
+			"/a/b/signal/d/!meta",
+			2,
+			false,
+		},
+		{
+			"/a/b/signal/d",
+			"/a/b/signal/d/!meta",
+			1,
+			true,
+		},
+		{
+			"/services/s.top/pantry/i.top/signal/cpu",
+			"/services/s.top/pantry/i.top/signal/cpu/!meta/UnitofMeasure",
+			2,
+			true,
+		},
+		{
+			"/services/s.top/pantry/i.top/signal/cpu",
+			"/services/s.top/pantry/i.top/signal/mem/!meta/UnitofMeasure",
+			2,
+			false,
+		},
+	} {
+		matches := MatchIgnoreLastN(test.uri, test.prefix, test.n)
+		if matches != test.matches {
+			t.Errorf("For %s %s %d got %v but wanted %v", test.uri, test.prefix, test.n, matches, test.matches)
+		}
+	}
+}
+
+func TestMatchIgnoreLastNBytes(t *testing.T) {
+	for _, test := range []struct {
+		uri     []byte
+		prefix  []byte
+		n       int
+		matches bool
+	}{
+		{
+			[]byte("/a"),
+			[]byte("/a"),
+			0,
+			true,
+		},
+		{
+			[]byte("/a/b/signal/d"),
+			[]byte("/a/b/signal/d/!meta/hello"),
+			2,
+			true,
+		},
+		{
+			[]byte("/a/b/signal/d"),
+			[]byte("/a/b/signal/d/!meta"),
+			2,
+			false,
+		},
+		{
+			[]byte("/a/b/signal/d"),
+			[]byte("/a/b/signal/d/!meta"),
+			1,
+			true,
+		},
+	} {
+		matches := MatchIgnoreLastNBytes(test.uri, test.prefix, test.n)
+		if matches != test.matches {
+			t.Errorf("For %s %s %d got %v but wanted %v", test.uri, test.prefix, test.n, matches, test.matches)
+		}
+	}
+}
