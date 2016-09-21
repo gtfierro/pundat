@@ -62,7 +62,11 @@ type DataParams struct {
 	// if true, then we interpret windowwidth.
 	IsWindow bool
 	// we interpret this as nanoseconds
-	Width uint64
+	Width           uint64
+	IsChangedRanges bool
+	FromGen         uint64
+	ToGen           uint64
+	Resolution      uint8
 }
 
 func (params DataParams) Dump() string {

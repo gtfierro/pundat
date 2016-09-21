@@ -35,7 +35,7 @@ type StatisticsReading struct {
 type Timeseries struct {
 	sync.RWMutex
 	Records    []*TimeseriesReading
-	Generation int64
+	Generation uint64
 	SrcURI     string
 	UUID       UUID
 }
@@ -55,7 +55,7 @@ func (ts *Timeseries) NumReadings() int {
 type StatisticTimeseries struct {
 	sync.RWMutex
 	Records    []*StatisticsReading
-	Generation int64
+	Generation uint64
 	SrcURI     string
 	UUID       UUID
 }
@@ -74,4 +74,16 @@ func (ts *StatisticTimeseries) NumReadings() int {
 
 type TimeseriesDataGroup interface {
 	NumReadings() int
+}
+
+// closed on start, open on end: [start, end)
+type TimeRange struct {
+	StartTime  int64
+	EndTime    int64
+	Generation uint64
+}
+
+type ChangedRange struct {
+	Ranges []*TimeRange
+	UUID   UUID
 }
