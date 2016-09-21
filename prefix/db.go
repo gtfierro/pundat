@@ -7,6 +7,7 @@ import (
 	"github.com/gtfierro/durandal/common"
 	"github.com/pkg/errors"
 	"log"
+	"strings"
 )
 
 // Handles the association of UUIDs to MD URIs
@@ -94,7 +95,7 @@ func (store *PrefixStore) AddMetadataURI(uri string) error {
 	return store.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(mdBucket)
 		id, _ := b.NextSequence()
-		return b.Put(itob(id), []byte(uri))
+		return b.Put([]byte(uri), itob(id))
 	})
 }
 
@@ -115,19 +116,20 @@ func (store *PrefixStore) AddUUIDURIMapping(uri string, uuid common.UUID) error 
 		}
 		id, _ := ub.NextSequence()
 		bytes := uuid.Bytes()
-		//log.Println("PUT URI BUCKET", uri)
 		return ub.Put(itob(id), bytes[:])
 	})
 }
 
-// assumes prefix has already been cleaned
-func (store *PrefixStore) GetMetadataSuperstrings(prefix string) ([]string, error) {
+func (store *PrefixStore) GetMetadataSuperstrings(uri string) ([]string, error) {
+	prefixes := getURIPrefixes(uri)
 	var matching []string
 	err := store.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(mdBucket).Cursor()
-		bpfx := []byte(prefix)
-		for k, _ := c.Seek(bpfx); bytes.HasPrefix(k, bpfx); k, _ = c.Next() {
-			matching = append(matching, string(k))
+		for _, prefix := range prefixes {
+			bpfx := []byte(prefix)
+			for k, _ := c.Seek(bpfx); matchIgnoreLastN(bpfx, k, 2); k, _ = c.Next() {
+				matching = append(matching, string(k))
+			}
 		}
 		return nil
 	})
@@ -178,4 +180,40 @@ func itob(v uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, v)
 	return b
+}
+
+// returns true if "prefix" is equal to "uri", ignoring the last n segments of "prefix"
+func matchIgnoreLastN(uri, prefix []byte, n int) bool {
+	var (
+		idx int
+	)
+	for i := 0; i < n; i++ {
+		idx = bytes.LastIndex(prefix, []byte("/"))
+		if idx < 0 {
+			break
+		}
+		prefix = prefix[:idx]
+	}
+	return bytes.Equal(uri, prefix)
+}
+
+func getURIPrefixes(uri string) []string {
+	var (
+		prefixes  []string
+		start     = 1
+		lastFound = 0
+	)
+	for lastFound >= 0 {
+		if uri[start:] == "!" {
+			break
+		}
+		lastFound = strings.Index(uri[start:], "/")
+		if lastFound < 0 {
+			prefixes = append(prefixes, uri)
+			break
+		}
+		prefixes = append(prefixes, uri[:start+lastFound])
+		start = start + lastFound + 1
+	}
+	return prefixes
 }
