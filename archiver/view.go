@@ -184,7 +184,7 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	request.Dump()
 
 	// now, we save the stream
-	stream.startArchiving(vm.ts, vm.store, vm.pfx)
+	stream.startArchiving(vm.ts, vm.store)
 
 	return nil
 }

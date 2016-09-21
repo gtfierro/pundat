@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"github.com/gtfierro/durandal/common"
 	"github.com/gtfierro/durandal/prefix"
-	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"net"
-	"time"
 )
 
 type mongoConfig struct {
@@ -17,13 +15,11 @@ type mongoConfig struct {
 }
 
 type mongoStore struct {
-	session      *mgo.Session
-	db           *mgo.Database
-	metadata     *mgo.Collection
-	streams      *mgo.Collection
-	mapping      *mgo.Collection
-	uriUUIDCache *ccache.Cache
-	pfx          *prefix.PrefixStore
+	session  *mgo.Session
+	db       *mgo.Database
+	metadata *mgo.Collection
+	records  *mgo.Collection
+	pfx      *prefix.PrefixStore
 }
 
 func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
@@ -41,13 +37,10 @@ func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 	// fetch/create collections and db reference
 	m.db = m.session.DB("durandal")
 	m.metadata = m.db.C("metadata")
-	m.streams = m.db.C("streams")
-	m.mapping = m.db.C("mapping")
+	m.records = m.db.C("records")
 
 	// add indexes. This will fail Fatal
 	m.addIndexes()
-
-	m.uriUUIDCache = ccache.New(ccache.Configure().MaxSize(10000))
 
 	return m
 }
@@ -67,35 +60,11 @@ func (m *mongoStore) addIndexes() {
 		log.Fatalf("Could not create index on metadata.{UUID, srcuri, key} (%v)", err)
 	}
 
-	//index.Key = []string{"Path"}
-	//index.Unique = false
-	//err = m.metadata.EnsureIndex(index)
-	//if err != nil {
-	//	log.Fatalf("Could not create index on metadata.Path (%v)", err)
-	//}
-
-	//index.Key = []string{"SrcURI"}
-	//index.Unique = false
-	//err = m.metadata.EnsureIndex(index)
-	//if err != nil {
-	//	log.Fatalf("Could not create index on metadata.URI (%v)", err)
-	//}
-
-	//index.Key = []string{"Key"}
-	//index.Unique = false
-	//err = m.metadata.EnsureIndex(index)
-	//if err != nil {
-	//	log.Fatalf("Could not create index on metadata.Key (%v)", err)
-	//}
-
-	//// mapping indexes
-	//index.Key = []string{"UUID", "URI"}
-	//index.Unique = true
-	//err = m.mapping.EnsureIndex(index)
-	//if err != nil {
-	//	log.Fatalf("Could not create index on mapping.UUID (%v)", err)
-	//}
-
+	index.Key = []string{"srcuri", "key"}
+	err = m.records.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on records.{srcuri,key} (%v)", err)
+	}
 }
 
 func (m *mongoStore) GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error) {
@@ -137,17 +106,22 @@ filter the results by:
 
 This requires testing and finish implementing the DOT stuff
 */
+/*
+This needs to work better;
+first run GetUUIDs on the where clause, and then use that list of UUIDs as the new where clause
+*/
 func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([]common.MetadataGroup, error) {
 	var (
-		whereClause bson.M
-		_results    []bson.M
+		_results []bson.M
 	)
-	if len(where) != 0 {
-		whereClause = where.ToBSON()
-	}
 	selectTags := bson.M{"_id": 0}
-	log.Warning("WHERE", where, whereClause, selectTags)
-	if err := m.metadata.Find(whereClause).Select(selectTags).All(&_results); err != nil {
+
+	matchingUUIDs, err := m.GetUUIDs(VK, where)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := m.metadata.Find(bson.M{"uuid": bson.M{"$in": matchingUUIDs}}).Select(selectTags).All(&_results); err != nil {
 		return nil, errors.Wrap(err, "Could not select tags")
 	}
 	log.Warning(_results)
@@ -161,7 +135,8 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 	)
 	for _, doc := range _results {
 		record := common.RecordFromBson(doc)
-		if group, found = grouping[record.UUID.String()]; !found {
+		group, found = grouping[record.UUID.String()]
+		if !found {
 			group = common.NewEmptyMetadataGroup()
 			group.UUID = record.UUID
 		}
@@ -177,6 +152,7 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 		grouping[record.UUID.String()] = group
 	}
 	for _, group := range grouping {
+		log.Debugf("%+v", group)
 		results = append(results, *group)
 	}
 	return results, nil
@@ -223,6 +199,18 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		log.Infof("Aborting metadata insert with 0 records")
 		return nil
 	}
+
+	// insert unmapped records
+	inserts := make([]interface{}, len(records))
+	for i, rec := range records {
+		inserts[i] = rec
+	}
+	err := m.records.Insert(inserts...)
+	if err != nil && !mgo.IsDup(err) {
+		return err
+	}
+
+	// attempt to update records for which a mapping exists
 	for _, rec := range records {
 		// need to "duplicate" each record by each of the streams it belongs to
 		stripped := StripBangMeta(rec.SrcURI)
@@ -234,7 +222,7 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		for _, u := range uuids {
 			rec.UUID = u
 			//log.Debugf("Inserting %+v", rec)
-			if _, err := m.metadata.Upsert(bson.M{"Key": rec.Key, "SrcURI": rec.SrcURI, "UUID": rec.UUID}, rec); !mgo.IsDup(err) {
+			if _, err := m.metadata.Upsert(bson.M{"key": rec.Key, "srcuri": rec.SrcURI, "uuid": rec.UUID}, rec); err != nil && !mgo.IsDup(err) {
 				return err
 			}
 		}
@@ -246,29 +234,74 @@ func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict)
 	return nil
 }
 
-func (m *mongoStore) MapURItoUUID(uri, ponum, valueExpr string, uuid common.UUID) error {
-	err := m.mapping.Insert(bson.M{"URI": uri, "PO": ponum, "valueExpr": valueExpr, "UUID": uuid})
-	m.uriUUIDCache.Set(uri, uuid, time.Minute*10)
-	if mgo.IsDup(err) {
-		return nil
+func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
+	// save the timeseries URI
+	if err := m.pfx.AddTimeseriesURI(uri); err != nil {
+		return errors.Wrap(err, "Could not add timeseries URI from stream")
 	}
-	return err
+	// associate the URI with this UUID
+	if err := m.pfx.AddUUIDURIMapping(uri, uuid); err != nil {
+		return errors.Wrap(err, "Could not save mapping of uri to uuid")
+	}
+
+	// make sure we deposit the UUID in the metadata table at the *very* least
+	if err := m.metadata.Insert(bson.M{"uuid": uuid}); err != nil && !mgo.IsDup(err) {
+		return errors.Wrap(err, "Could not insert UUID")
+	}
+
+	/*
+		Issue: given a URI /a/b/signal/c, when we look at prefix /a/b/signal, we get the tags for all of the possible signals,
+		which can overwrite each other; this is bad!
+	*/
+
+	// find all prefixes for the URI
+	//prefixes := GetURIPrefixes(uri)
+	//var mappedURIs []string
+	// find existing metadata tags for each of the "prefixes" of the main URI
+	//for _, prefix := range prefixes {
+	mappedURIs, err := m.pfx.GetMetadataSuperstrings(uri)
+	if err != nil {
+		return err
+	}
+	// for these metadata URIs, copy their metadata into the MD database for this UUID
+	var records []bson.M
+	if err := m.records.Find(bson.M{"srcuri": bson.M{"$in": mappedURIs}}).All(&records); err != nil {
+		return errors.Wrap(err, "Could not fetch records")
+	}
+	if len(records) > 0 {
+		for _, rec := range records {
+			rec["uuid"] = uuid
+			upsert := bson.M{
+				"key":    rec["key"],
+				"srcuri": rec["srcuri"],
+				"uuid":   rec["uuid"],
+			}
+			delete(rec, "_id")
+			if _, err := m.metadata.Upsert(upsert, rec); err != nil && !mgo.IsDup(err) {
+				log.Error(err)
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (m *mongoStore) URItoUUID(uri string) (common.UUID, error) {
-	item, err := m.uriUUIDCache.Fetch(uri, time.Minute*10, func() (interface{}, error) {
-		var (
-			uuid common.UUID
-		)
-		err := m.mapping.Find(bson.M{"URI": uri}).Select(bson.M{"uuid": 1}).One(&uuid)
-		if err != nil {
-			return nil, nil
-		}
-		return uuid, nil
-	})
-	item.Extend(10 * time.Minute)
-	if item.Value() == nil {
-		return nil, errors.New(fmt.Sprintf("No UUID for URI %s", uri))
-	}
-	return item.Value().(common.UUID), err
+	return nil, nil
+	//item, err := m.uriUUIDCache.Fetch(uri, time.Minute*10, func() (interface{}, error) {
+	//	var (
+	//		uuid common.UUID
+	//	)
+	//	err := m.mapping.Find(bson.M{"URI": uri}).Select(bson.M{"uuid": 1}).One(&uuid)
+	//	if err != nil {
+	//		return nil, nil
+	//	}
+	//	return uuid, nil
+	//})
+	//item.Extend(10 * time.Minute)
+	//if item.Value() == nil {
+	//	return nil, errors.New(fmt.Sprintf("No UUID for URI %s", uri))
+	//}
+	//return item.Value().(common.UUID), err
 }

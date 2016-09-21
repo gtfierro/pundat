@@ -82,13 +82,14 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					SrcURI: msg.URI,
 				}
 
-				// map the metadata URIs for this particular URI to the generated UUID
-				if err := pfx.AddTimeseriesURI(msg.URI); err != nil {
-					log.Error(errors.Wrap(err, "Could not add timeseries URI from stream"))
-					continue
-				}
-				if err := pfx.AddUUIDURIMapping(msg.URI, currentUUID); err != nil {
-					log.Error(errors.Wrap(err, "Could not save mapping of uri to uuid"))
+				/*
+					When we observe a UUID, we need to build up the associations to its metadata
+					When I get a new UUID, with a URI, I need to find all of the Metadata rcords
+					in the MD database that are prefixes of this URI (w/o !meta suffix) and add
+					those associations in when we need to
+				*/
+				if err := metadataStore.MapURItoUUID(msg.URI, currentUUID); err != nil {
+					log.Error(err)
 					continue
 				}
 
