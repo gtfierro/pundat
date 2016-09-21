@@ -43,7 +43,6 @@ What's the API we want to support?
 
 // ignore if already exists
 AddMetadataURI(uri string) error
-AddTimeseriesURI(uri string) error
 
 // given a prefix, returns the set of metadata URIs it is a prefix of
 GetMetadataSuperstrings(prefix string) ([]string, error)
@@ -99,24 +98,22 @@ func (store *PrefixStore) AddMetadataURI(uri string) error {
 	})
 }
 
-func (store *PrefixStore) AddTimeseriesURI(uri string) error {
+func (store *PrefixStore) AddUUIDURIMapping(uri string, uuid common.UUID) error {
 	return store.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(tsBucket)
 		id, _ := b.NextSequence()
-		return b.Put([]byte(uri), itob(id))
-	})
-}
-
-func (store *PrefixStore) AddUUIDURIMapping(uri string, uuid common.UUID) error {
-	return store.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(uuidBucket)
-		ub, err := b.CreateBucketIfNotExists([]byte(uri))
-		if err != nil {
-			return err
+		err := b.Put([]byte(uri), itob(id))
+		if err == nil {
+			b = tx.Bucket(uuidBucket)
+			ub, err := b.CreateBucketIfNotExists([]byte(uri))
+			if err != nil {
+				return err
+			}
+			id, _ := ub.NextSequence()
+			bytes := uuid.Bytes()
+			err = ub.Put(itob(id), bytes[:])
 		}
-		id, _ := ub.NextSequence()
-		bytes := uuid.Bytes()
-		return ub.Put(itob(id), bytes[:])
+		return err
 	})
 }
 

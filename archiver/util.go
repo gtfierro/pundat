@@ -1,7 +1,6 @@
 package archiver
 
 import (
-	"bytes"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"strings"
@@ -216,7 +215,6 @@ func StripBangMeta(uri string) string {
 }
 
 // returns true if "prefix" is equal to "uri", ignoring the last n segments of "prefix"
-// TODO: do a byte one too
 func MatchIgnoreLastN(uri, prefix string, n int) bool {
 	var (
 		idx int
@@ -229,20 +227,4 @@ func MatchIgnoreLastN(uri, prefix string, n int) bool {
 		prefix = prefix[:idx]
 	}
 	return uri == prefix
-}
-
-// returns true if "prefix" is equal to "uri", ignoring the last n segments of "prefix"
-// TODO: do a byte one too
-func MatchIgnoreLastNBytes(uri, prefix []byte, n int) bool {
-	var (
-		idx int
-	)
-	for i := 0; i < n; i++ {
-		idx = bytes.LastIndex(prefix, []byte("/"))
-		if idx < 0 {
-			break
-		}
-		prefix = prefix[:idx]
-	}
-	return bytes.Equal(uri, prefix)
 }

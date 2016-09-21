@@ -215,13 +215,11 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		// need to "duplicate" each record by each of the streams it belongs to
 		stripped := StripBangMeta(rec.SrcURI)
 		uuids, err := m.pfx.GetUUIDsFromURI(stripped)
-		//log.Warning("GOT UUIDS", uuids)
 		if err != nil {
 			return err
 		}
 		for _, u := range uuids {
 			rec.UUID = u
-			//log.Debugf("Inserting %+v", rec)
 			if _, err := m.metadata.Upsert(bson.M{"key": rec.Key, "srcuri": rec.SrcURI, "uuid": rec.UUID}, rec); err != nil && !mgo.IsDup(err) {
 				return err
 			}
@@ -235,10 +233,6 @@ func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict)
 }
 
 func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
-	// save the timeseries URI
-	if err := m.pfx.AddTimeseriesURI(uri); err != nil {
-		return errors.Wrap(err, "Could not add timeseries URI from stream")
-	}
 	// associate the URI with this UUID
 	if err := m.pfx.AddUUIDURIMapping(uri, uuid); err != nil {
 		return errors.Wrap(err, "Could not save mapping of uri to uuid")
@@ -249,16 +243,7 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 		return errors.Wrap(err, "Could not insert UUID")
 	}
 
-	/*
-		Issue: given a URI /a/b/signal/c, when we look at prefix /a/b/signal, we get the tags for all of the possible signals,
-		which can overwrite each other; this is bad!
-	*/
-
-	// find all prefixes for the URI
-	//prefixes := GetURIPrefixes(uri)
-	//var mappedURIs []string
 	// find existing metadata tags for each of the "prefixes" of the main URI
-	//for _, prefix := range prefixes {
 	mappedURIs, err := m.pfx.GetMetadataSuperstrings(uri)
 	if err != nil {
 		return err
@@ -289,19 +274,4 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 
 func (m *mongoStore) URItoUUID(uri string) (common.UUID, error) {
 	return nil, nil
-	//item, err := m.uriUUIDCache.Fetch(uri, time.Minute*10, func() (interface{}, error) {
-	//	var (
-	//		uuid common.UUID
-	//	)
-	//	err := m.mapping.Find(bson.M{"URI": uri}).Select(bson.M{"uuid": 1}).One(&uuid)
-	//	if err != nil {
-	//		return nil, nil
-	//	}
-	//	return uuid, nil
-	//})
-	//item.Extend(10 * time.Minute)
-	//if item.Value() == nil {
-	//	return nil, errors.New(fmt.Sprintf("No UUID for URI %s", uri))
-	//}
-	//return item.Value().(common.UUID), err
 }

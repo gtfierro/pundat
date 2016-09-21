@@ -132,9 +132,7 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 }
 
 func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
-	//TODO: need a mapping from the archive
-	// requests to the URI that provided them so that we
-	// can detect when an archive request is removed
+	//TODO: need a mapping from the archive requests to the URI that provided them so that we can detect when an archive request is removed
 	if request.FromVK == "" {
 		return errors.New("VK was empty in ArchiveRequest")
 	}
