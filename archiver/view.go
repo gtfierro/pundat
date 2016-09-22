@@ -9,7 +9,6 @@ import (
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"reflect"
 	"strings"
-	//	"time"
 )
 
 // takes care of handling/parsing archive requests
@@ -94,20 +93,20 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 				continue
 			}
 			if request.PO == 0 {
-				log.Error(errors.Wrap(err, "Request contained no PO"))
+				log.Error("Request contained no PO")
 				continue
 			}
-			if request.Value == "" {
-				log.Error(errors.Wrap(err, "Request contained no Value expression"))
+			if len(request.Name) == 0 {
+				log.Error("Request contained no Name")
+			}
+			if request.ValueExpr == "" {
+				log.Error("Request contained no Value expression")
 				continue
 			}
 			request.FromVK = msg.From
 			if request.URI == "" { // no URI supplied
 				request.URI = strings.TrimSuffix(request.URI, "!meta/giles")
 				request.URI = strings.TrimSuffix(request.URI, "/")
-			}
-			if len(request.MetadataURIs) == 0 {
-				request.MetadataURIs = []string{request.URI}
 			}
 			// TODO: does the FROM VK have permission to ask this?
 			requests = append(requests, request)
@@ -140,19 +139,20 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	// a Stream's URI is its subscription for timeseries data
 	stream := &Stream{
 		uri:             request.URI,
+		name:            request.Name,
 		cancel:          make(chan bool),
-		valueString:     request.Value,
+		valueString:     request.ValueExpr,
 		inheritMetadata: request.InheritMetadata,
 	}
 
-	stream.valueExpr = ob.Parse(request.Value)
+	stream.valueExpr = ob.Parse(request.ValueExpr)
 
-	if request.UUID != "" {
-		stream.uuidExpr = ob.Parse(request.UUID)
+	if len(request.UUIDExpr) > 0 {
+		stream.uuidExpr = ob.Parse(request.UUIDExpr)
 	}
 
-	if request.Time != "" {
-		stream.timeExpr = ob.Parse(request.Time)
+	if len(request.TimeExpr) > 0 {
+		stream.timeExpr = ob.Parse(request.TimeExpr)
 	}
 
 	var metadataURIs []string
@@ -161,11 +161,6 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 			metadataURIs = append(metadataURIs, uri+"/!meta/+")
 		}
 	}
-	for _, uri := range request.MetadataURIs {
-		stream.metadataURIs = append(stream.metadataURIs, uri)
-		metadataURIs = append(metadataURIs, uri+"/!meta/+")
-	}
-
 	sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
 		URI: stream.uri,
 	})

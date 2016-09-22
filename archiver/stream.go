@@ -15,7 +15,8 @@ type Stream struct {
 	uuidExpr []ob.Operation
 	// immutable source of the stream. What the Archive Request points to.
 	// This is what we subscribe to for data to archive (but not metadata)
-	uri string
+	uri  string
+	name string
 	// list of Metadata URIs
 	metadataURIs    []string
 	inheritMetadata bool
@@ -75,19 +76,17 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 				} else {
 					// generate the UUID for this message's URI, POnum and value expression (and the name, when we have it)
 					//TODO: add a name to the UUID
-					currentUUID = common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, msg.URI+po.GetPODotNum()+s.valueString).String())
+					currentUUID = common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, msg.URI+po.GetPODotNum()+s.name).String())
 				}
 				ts := common.Timeseries{
 					UUID:   currentUUID,
 					SrcURI: msg.URI,
 				}
 
-				/*
-					When we observe a UUID, we need to build up the associations to its metadata
-					When I get a new UUID, with a URI, I need to find all of the Metadata rcords
-					in the MD database that are prefixes of this URI (w/o !meta suffix) and add
-					those associations in when we need to
-				*/
+				//	When we observe a UUID, we need to build up the associations to its metadata
+				//	When I get a new UUID, with a URI, I need to find all of the Metadata rcords
+				//	in the MD database that are prefixes of this URI (w/o !meta suffix) and add
+				//	those associations in when we need to
 				if err := metadataStore.MapURItoUUID(msg.URI, currentUUID); err != nil {
 					log.Error(err)
 					continue
@@ -146,5 +145,4 @@ This involves:
 - save the state of the stream:
 	- send the list of metadatauris to the subber
 	- save the mapping of stream UUID to those URIs
-
 */
