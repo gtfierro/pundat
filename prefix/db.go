@@ -89,13 +89,21 @@ func NewPrefixStore(filename string) *PrefixStore {
 	return store
 }
 
-//TODO: maybe add a "read" check first to optimistically skip writing every time?
 func (store *PrefixStore) AddMetadataURI(uri string) error {
-	return store.db.Update(func(tx *bolt.Tx) error {
+	var found = false
+	err := store.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(mdBucket)
-		id, _ := b.NextSequence()
-		return b.Put([]byte(uri), itob(id))
+		found = b.Get([]byte(uri)) != nil
+		return nil
 	})
+	if !found && err == nil {
+		err = store.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket(mdBucket)
+			id, _ := b.NextSequence()
+			return b.Put([]byte(uri), itob(id))
+		})
+	}
+	return err
 }
 
 func (store *PrefixStore) AddUUIDURIMapping(uri string, uuid common.UUID) error {
