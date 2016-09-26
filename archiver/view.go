@@ -108,7 +108,11 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 				request.URI = strings.TrimSuffix(request.URI, "!meta/giles")
 				request.URI = strings.TrimSuffix(request.URI, "/")
 			}
-			// TODO: does the FROM VK have permission to ask this?
+			chain, err := vm.client.BuildAnyChain(request.URI, "C", request.FromVK)
+			if err != nil || chain == nil {
+				log.Error(errors.Wrapf(err, "VK %s did not have permission to archive %s", request.FromVK, request.URI))
+				continue
+			}
 			requests = append(requests, request)
 		}
 		for _, request := range requests {
