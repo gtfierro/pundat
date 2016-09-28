@@ -146,10 +146,10 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 
 	var reply []bw2.PayloadObject
 
-	log.Infof("Got Metadata %+v", mdRes)
-	log.Infof("Got Timeseries %+v", tsRes)
-	log.Infof("Got Statistics %+v", statsRes)
-	log.Infof("Got Changed %+v", changedRes)
+	log.Infof("Got Metadata %+v", len(mdRes))
+	log.Infof("Got Timeseries %+v", len(tsRes))
+	log.Infof("Got Statistics %+v", len(statsRes))
+	log.Infof("Got Changed %+v", len(changedRes))
 	metadataPayload := POsFromMetadataGroup(query.Nonce, mdRes)
 	reply = append(reply, metadataPayload)
 
