@@ -3,10 +3,14 @@ package main
 import (
 	"fmt"
 	"github.com/codegangsta/cli"
+	"github.com/gtfierro/bwquery/api"
 	"github.com/gtfierro/durandal/archiver"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
+	bw2 "gopkg.in/immesys/bw2bind.v5"
+	"gopkg.in/readline.v1"
 	"os"
+	"os/user"
 	"runtime"
 	"time"
 )
@@ -66,6 +70,80 @@ func makeConfig(c *cli.Context) error {
 	return f.Sync()
 }
 
+func doIQuery(c *cli.Context) error {
+	client := bw2.ConnectOrExit("")
+	vk := client.SetEntityFileOrExit(c.String("entity"))
+	client.OverrideAutoChainTo(true)
+	API := api.NewAPI(client, vk, c.String("archiver"))
+
+	res, err := client.Query(&bw2.QueryParams{
+		URI: c.String("archiver") + "/s.giles/!meta/lastalive",
+	})
+	if err != nil {
+		return err
+	}
+	for msg := range res {
+		var md map[string]interface{}
+		po := msg.GetOnePODF(bw2.PODFMaskSMetadata)
+		if err := po.(bw2.MsgPackPayloadObject).ValueInto(&md); err != nil {
+			log.Error(errors.Wrap(err, "Could not decode lastalive time"))
+		} else {
+			//2016-09-16 10:41:40.818797445 -0700 PDT
+			lastalive, err := time.Parse("2006-01-02 15:04:05 -0700 MST", md["val"].(string))
+			if err != nil {
+				log.Error(errors.Wrap(err, "Could not decode lastalive time"))
+			}
+			ago := time.Since(lastalive)
+			if ago.Minutes() > time.Duration(5*time.Minute).Minutes() {
+				log.Errorf("Archiver at %s last alive at %v (%v ago)", c.String("archiver"), lastalive, ago)
+			} else {
+				log.Infof("Archiver at %s last alive at %v (%v ago)", c.String("archiver"), lastalive, ago)
+			}
+		}
+	}
+
+	currentUser, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	completer := readline.NewPrefixCompleter(
+		readline.PcItem("select",
+			readline.PcItem("data",
+				readline.PcItem("in"),
+				readline.PcItem("before"),
+				readline.PcItem("after"),
+			),
+			readline.PcItem("Metadata/"),
+			readline.PcItem("distinct",
+				readline.PcItem("Metadata/"),
+				readline.PcItem("uuid/"),
+			),
+			readline.PcItem("uuid"),
+		),
+	)
+
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:       "(bwquery)>",
+		AutoComplete: completer,
+		HistoryFile:  currentUser.HomeDir + "/.bwquery",
+	})
+	if err != nil {
+		return err
+	}
+	defer rl.Close()
+
+	for {
+		line, err := rl.Readline()
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		API.Query(line)
+	}
+	return nil
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "Durandal"
@@ -91,6 +169,24 @@ func main() {
 				cli.StringFlag{
 					Name:  "file,f",
 					Usage: "Name of the config file",
+				},
+			},
+		},
+		{
+			Name:   "query",
+			Usage:  "Evaluate query interactively",
+			Action: doIQuery,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "entity,e",
+					Value:  "",
+					Usage:  "The entity to use",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+				cli.StringFlag{
+					Name:  "archiver,a",
+					Value: "scratch.ns",
+					Usage: "REQUIRED. The base URI of the archiver you want to query",
 				},
 			},
 		},

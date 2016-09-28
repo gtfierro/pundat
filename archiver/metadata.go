@@ -72,7 +72,6 @@ func newMetadataSubscriber(client *bw2.BW2Client, store MetadataStore, pfx *pref
 		for _ = range ms.commitTimer.C {
 			ms.Lock()
 			ms.commitLock.Lock()
-			log.Infof("COMMITTING %d records", len(ms.uncommitted))
 			if err := ms.store.SaveMetadata(ms.uncommitted); err != nil {
 				log.Error(errors.Wrap(err, "Could not save metadata"))
 			}
