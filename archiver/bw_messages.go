@@ -67,6 +67,9 @@ func (msg QueryTimeseriesResult) Dump() string {
 	for _, ts := range msg.Data {
 		res += ts.Dump()
 	}
+	for _, ts := range msg.Stats {
+		res += ts.Dump()
+	}
 	return res
 }
 
@@ -167,6 +170,18 @@ func (msg Statistics) ToReadings() []common.Reading {
 		res[idx] = &common.StatisticalNumberReading{Time: msg.Times[idx], UoT: common.GuessTimeUnit(msg.Times[idx]), Count: msg.Count[idx], Min: msg.Min[idx], Max: msg.Max[idx], Mean: msg.Mean[idx]}
 	}
 	return res
+}
+
+func (msg Statistics) Dump() string {
+	var res [][]interface{}
+	for i, time := range msg.Times {
+		res = append(res, []interface{}{time, msg.Count[i], msg.Min[i], msg.Mean[i], msg.Max[i]})
+	}
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Generation": msg.Generation, "Timeseries": res}, "", "  "); err != nil {
+		return fmt.Sprintf("%+v", res)
+	} else {
+		return string(bytes)
+	}
 }
 
 type ChangedRange struct {
