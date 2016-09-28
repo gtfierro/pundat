@@ -83,6 +83,14 @@ func (msg QueryChangedResult) ToMsgPackBW() (po bw2.PayloadObject) {
 	return
 }
 
+func (msg QueryChangedResult) Dump() string {
+	var res string
+	for _, cr := range msg.Changed {
+		res += cr.Dump()
+	}
+	return res
+}
+
 type KeyValueMetadata struct {
 	UUID     string
 	Path     string
@@ -189,6 +197,14 @@ type ChangedRange struct {
 	Generation uint64
 	StartTime  int64
 	EndTime    int64
+}
+
+func (msg ChangedRange) Dump() string {
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Generation": msg.Generation, "Start": msg.StartTime, "End": msg.EndTime}, "", "  "); err != nil {
+		return fmt.Sprintf("%+v", msg)
+	} else {
+		return string(bytes)
+	}
 }
 
 type BWavable interface {
