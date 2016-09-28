@@ -75,7 +75,6 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					currentUUID = ob.Eval(s.uuidExpr, thing).(common.UUID)
 				} else {
 					// generate the UUID for this message's URI, POnum and value expression (and the name, when we have it)
-					//TODO: add a name to the UUID
 					currentUUID = common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, msg.URI+po.GetPODotNum()+s.name).String())
 				}
 				ts := common.Timeseries{
