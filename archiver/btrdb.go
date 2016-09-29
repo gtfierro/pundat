@@ -1,10 +1,10 @@
 package archiver
 
 import (
-	btrdb "github.com/SoftwareDefinedBuildings/btrdb-go"
 	"github.com/gtfierro/durandal/common"
 	uuidlib "github.com/pborman/uuid"
 	"github.com/pkg/errors"
+	btrdb "gopkg.in/btrdb.v3"
 	"math/rand"
 	"net"
 	"sync"
@@ -31,7 +31,7 @@ func newBtrIface(c *btrdbConfig) *btrIface {
 	var err error
 	b := &btrIface{
 		address: c.address,
-		clients: make([]*btrdb.BTrDBConnection, 10),
+		clients: make([]*btrdb.BTrDBConnection, 100),
 	}
 	log.Noticef("Connecting to BtrDB at %v...", b.address.String())
 
@@ -39,7 +39,7 @@ func newBtrIface(c *btrdbConfig) *btrIface {
 		log.Fatalf("Could not connect to btrdb: %v", err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		c, err := btrdb.NewBTrDBConnection(c.address.String())
 		if err != nil {
 			log.Fatalf("Could not connect to btrdb: %v", err)
@@ -51,9 +51,7 @@ func newBtrIface(c *btrdbConfig) *btrIface {
 }
 
 func (bdb *btrIface) getClient() *btrdb.BTrDBConnection {
-	bdb.RLock()
-	defer bdb.RUnlock()
-	return bdb.clients[rand.Intn(10)]
+	return bdb.clients[rand.Intn(100)]
 }
 
 func (bdb *btrIface) AddReadings(ts common.Timeseries) error {
@@ -71,7 +69,7 @@ func (bdb *btrIface) AddReadings(ts common.Timeseries) error {
 	}
 	client := bdb.getClient()
 	c, err := client.InsertValues(parsed_uuid, records, false)
-	<-c // wait for response
+	<-c
 	return err
 }
 
@@ -99,21 +97,39 @@ func (bdb *btrIface) queryNearestValue(uuids []common.UUID, start uint64, backwa
 	var ret = make([]common.Timeseries, len(uuids))
 	var results []chan btrdb.StandardValue
 	var generations []chan uint64
+	var reasons []chan string
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, _, err := client.QueryNearestValue(uuid, int64(start), backwards, 0)
-		if err != nil {
-			return ret, err
-		}
+		values, gens, reason, err := client.QueryNearestValue(uuid, int64(start), backwards, 0)
 		results = append(results, values)
 		generations = append(generations, gens)
+		reasons = append(reasons, reason)
+		if err != nil {
+			for _, c := range results {
+				for _ = range c {
+				}
+			}
+			for _, c := range generations {
+				for _ = range c {
+				}
+			}
+			for _, c := range reasons {
+				for _ = range c {
+				}
+			}
+			return ret, err
+		}
 	}
 	for i, c := range results {
 		sr := bdb.numberResponseFromChan(c)
 		sr.UUID = uuids[i]
 		sr.Generation = <-generations[i]
 		ret[i] = sr
+	}
+	for _, c := range reasons {
+		for _ = range c {
+		}
 	}
 	return ret, nil
 }
@@ -130,21 +146,39 @@ func (bdb *btrIface) GetData(uuids []common.UUID, start, end uint64) ([]common.T
 	var ret = make([]common.Timeseries, len(uuids))
 	var results []chan btrdb.StandardValue
 	var generations []chan uint64
+	var reasons []chan string
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, _, err := client.QueryStandardValues(uuid, int64(start), int64(end), 0)
-		if err != nil {
-			return ret, err
-		}
+		values, gens, reason, err := client.QueryStandardValues(uuid, int64(start), int64(end), 0)
 		results = append(results, values)
 		generations = append(generations, gens)
+		reasons = append(reasons, reason)
+		if err != nil {
+			for _, c := range results {
+				for _ = range c {
+				}
+			}
+			for _, c := range generations {
+				for _ = range c {
+				}
+			}
+			for _, c := range reasons {
+				for _ = range c {
+				}
+			}
+			return ret, err
+		}
 	}
 	for i, c := range results {
 		sr := bdb.numberResponseFromChan(c)
 		sr.UUID = uuids[i]
 		sr.Generation = <-generations[i]
 		ret[i] = sr
+	}
+	for _, c := range reasons {
+		for _ = range c {
+		}
 	}
 	return ret, nil
 }
@@ -153,21 +187,39 @@ func (bdb *btrIface) StatisticalData(uuids []common.UUID, pointWidth int, start,
 	var ret = make([]common.StatisticTimeseries, len(uuids))
 	var results []chan btrdb.StatisticalValue
 	var generations []chan uint64
+	var reasons []chan string
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, _, err := client.QueryStatisticalValues(uuid, int64(start), int64(end), uint8(pointWidth), 0)
-		if err != nil {
-			return ret, err
-		}
+		values, gens, reason, err := client.QueryStatisticalValues(uuid, int64(start), int64(end), uint8(pointWidth), 0)
 		results = append(results, values)
 		generations = append(generations, gens)
+		reasons = append(reasons, reason)
+		if err != nil {
+			for _, c := range results {
+				for _ = range c {
+				}
+			}
+			for _, c := range generations {
+				for _ = range c {
+				}
+			}
+			for _, c := range reasons {
+				for _ = range c {
+				}
+			}
+			return ret, err
+		}
 	}
 	for i, c := range results {
 		sr := bdb.statisticalResponseFromChan(c)
 		sr.UUID = uuids[i]
 		sr.Generation = <-generations[i]
 		ret[i] = sr
+	}
+	for _, c := range reasons {
+		for _ = range c {
+		}
 	}
 	return ret, nil
 }
@@ -176,21 +228,39 @@ func (bdb *btrIface) WindowData(uuids []common.UUID, width, start, end uint64) (
 	var ret = make([]common.StatisticTimeseries, len(uuids))
 	var results []chan btrdb.StatisticalValue
 	var generations []chan uint64
+	var reasons []chan string
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, _, err := client.QueryWindowValues(uuid, int64(start), int64(end), width, 0, 0)
-		if err != nil {
-			return ret, err
-		}
+		values, gens, reason, err := client.QueryWindowValues(uuid, int64(start), int64(end), width, 0, 0)
 		results = append(results, values)
 		generations = append(generations, gens)
+		reasons = append(reasons, reason)
+		if err != nil {
+			for _, c := range results {
+				for _ = range c {
+				}
+			}
+			for _, c := range generations {
+				for _ = range c {
+				}
+			}
+			for _, c := range reasons {
+				for _ = range c {
+				}
+			}
+			return ret, err
+		}
 	}
 	for i, c := range results {
 		sr := bdb.statisticalResponseFromChan(c)
 		sr.UUID = uuids[i]
 		sr.Generation = <-generations[i]
 		ret[i] = sr
+	}
+	for _, c := range reasons {
+		for _ = range c {
+		}
 	}
 	return ret, nil
 }
@@ -199,15 +269,29 @@ func (bdb *btrIface) ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64,
 	var ret = make([]common.ChangedRange, len(uuids))
 	var ranges []chan btrdb.TimeRange
 	var generations []chan uint64
+	var reasons []chan string
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		timeRange, generation, _, err := client.QueryChangedRanges(uuid, from_gen, to_gen, resolution)
-		if err != nil {
-			return ret, err
-		}
+		timeRange, generation, reason, err := client.QueryChangedRanges(uuid, from_gen, to_gen, resolution)
 		ranges = append(ranges, timeRange)
 		generations = append(generations, generation)
+		reasons = append(reasons, reason)
+		if err != nil {
+			for _, c := range ranges {
+				for _ = range c {
+				}
+			}
+			for _, c := range generations {
+				for _ = range c {
+				}
+			}
+			for _, c := range reasons {
+				for _ = range c {
+				}
+			}
+			return ret, err
+		}
 	}
 	for i, c := range ranges {
 		cr := common.ChangedRange{
@@ -215,7 +299,6 @@ func (bdb *btrIface) ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64,
 			Ranges: []*common.TimeRange{},
 		}
 		for rng := range c {
-			log.Debug("got range", rng)
 			tr := &common.TimeRange{
 				StartTime:  rng.StartTime,
 				EndTime:    rng.EndTime,
@@ -224,6 +307,10 @@ func (bdb *btrIface) ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64,
 			cr.Ranges = append(cr.Ranges, tr)
 		}
 		ret[i] = cr
+	}
+	for _, c := range reasons {
+		for _ = range c {
+		}
 	}
 	return ret, nil
 }
