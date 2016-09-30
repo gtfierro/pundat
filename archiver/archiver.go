@@ -150,14 +150,20 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 	log.Infof("Got Timeseries %+v", len(tsRes))
 	log.Infof("Got Statistics %+v", len(statsRes))
 	log.Infof("Got Changed %+v", len(changedRes))
-	metadataPayload := POsFromMetadataGroup(query.Nonce, mdRes)
-	reply = append(reply, metadataPayload)
+	if len(mdRes) > 0 {
+		metadataPayload := POsFromMetadataGroup(query.Nonce, mdRes)
+		reply = append(reply, metadataPayload)
+	}
 
-	timeseriesPayload := POsFromTimeseriesGroup(query.Nonce, tsRes, statsRes)
-	reply = append(reply, timeseriesPayload)
+	if len(tsRes)+len(statsRes) > 0 {
+		timeseriesPayload := POsFromTimeseriesGroup(query.Nonce, tsRes, statsRes)
+		reply = append(reply, timeseriesPayload)
+	}
 
-	changedPayload := POsFromChangedGroup(query.Nonce, changedRes)
-	reply = append(reply, changedPayload)
+	if len(changedRes) > 0 {
+		changedPayload := POsFromChangedGroup(query.Nonce, changedRes)
+		reply = append(reply, changedPayload)
+	}
 
 	log.Debugf("Reply on %s: %d", a.iface.SignalURI(signalURI), len(reply))
 
