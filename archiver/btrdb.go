@@ -31,7 +31,7 @@ func newBtrIface(c *btrdbConfig) *btrIface {
 	var err error
 	b := &btrIface{
 		address: c.address,
-		clients: make([]*btrdb.BTrDBConnection, 100),
+		clients: make([]*btrdb.BTrDBConnection, 10),
 	}
 	log.Noticef("Connecting to BtrDB at %v...", b.address.String())
 
@@ -39,7 +39,7 @@ func newBtrIface(c *btrdbConfig) *btrIface {
 		log.Fatalf("Could not connect to btrdb: %v", err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		c, err := btrdb.NewBTrDBConnection(c.address.String())
 		if err != nil {
 			log.Fatalf("Could not connect to btrdb: %v", err)
@@ -51,7 +51,7 @@ func newBtrIface(c *btrdbConfig) *btrIface {
 }
 
 func (bdb *btrIface) getClient() *btrdb.BTrDBConnection {
-	return bdb.clients[rand.Intn(100)]
+	return bdb.clients[rand.Intn(10)]
 }
 
 func (bdb *btrIface) AddReadings(ts common.Timeseries) error {
