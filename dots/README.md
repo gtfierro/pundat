@@ -50,6 +50,8 @@ For an archival DOT for URI `<uri>` with start time `t1` and end time `t2`, we b
 allows `A` to query the archiver for data published in the range [t1, t2] *in addition* to the range
 granted by the access DOTs.
 
+Note that the `archive` namespace is *not* routable!
+
 The first problem to solve is how to bootstrap these ranges of data: who has permission to access the entire
 history of a stream, and how does the archiver verify that this is true?
 
