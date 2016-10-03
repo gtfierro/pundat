@@ -21,12 +21,13 @@ had access, with the intention of keeping them private from each other).
 
 For example, using logical timestamps, we may have 2 DOT chains for key `A` granted on `<uri>`:
 
-* ns authority grants permission `C` on `<uri>` to entity `B`. Granted: 1, Expire: 20
-* `B` grants permission `C` on `<uri>` to entity `C`. Granted: 10, Expire: 20
-* `C` grant permission `C` on `<uri>` to entity `A`. Granted: 10, Expire: 15
-
-* ns authority grants permission `C` on `<uri>` to entity `D`. Granted: 1, Expire: 20
-* `D` grants permission `C` on `<uri>` to entity `A`. Granted: 5, Expire: 10
+1. Chain:
+  * ns authority grants permission `C` on `<uri>` to entity `B`. Granted: 1, Expire: 20
+  * `B` grants permission `C` on `<uri>` to entity `C`. Granted: 10, Expire: 20
+  * `C` grant permission `C` on `<uri>` to entity `A`. Granted: 10, Expire: 15
+2. Chain:
+  * ns authority grants permission `C` on `<uri>` to entity `D`. Granted: 1, Expire: 20
+  * `D` grants permission `C` on `<uri>` to entity `A`. Granted: 5, Expire: 10
 
 In this case, entity `A` has 2 DOTs on `<uri>`, one from time 5 to 10, and the other from time
 10 to 15 (these two ranges are the intersections of the grant times on the DOT chains). We
@@ -77,16 +78,17 @@ determine the archival ranges to be the union of these intersections.
 
 For example (all grants are for `C` permission, not `C*` or `P` or `L`, and all numbers are timestamps)
 
-* ns authority grants on `archive/start/1/end/50/<uri>` to entity `B`
-* `B` grants on `archive/start/40/end/50/<uri>` to entity `A`
-
-* ns authority grants on `archive/start/1/end/50/<uri>` to entity `C`
-* `C` grants on `archive/start/20/end/25/<uri>` to entity `A`
-
-* `D` grants on `archive/start/10/end/20/<uri>` to entity `A`
-
-* ns authority grants on `archive/start/1/end/20/<uri>` to entity `E`
-* `E` grants on `archive/start/30/end/40/<uri>` to entity `A`
+1. Chain:
+  * ns authority grants on `archive/start/1/end/50/<uri>` to entity `B`
+  * `B` grants on `archive/start/40/end/50/<uri>` to entity `A`
+2. Chain:
+  * ns authority grants on `archive/start/1/end/50/<uri>` to entity `C`
+  * `C` grants on `archive/start/20/end/25/<uri>` to entity `A`
+3. Chain:
+  * `D` grants on `archive/start/10/end/20/<uri>` to entity `A`
+4. Chain:
+  * ns authority grants on `archive/start/1/end/20/<uri>` to entity `E`
+  * `E` grants on `archive/start/30/end/40/<uri>` to entity `A`
 
 Here, there are 4 archival DOTs on `<uri>` for entity `A`, but only some of them are valid.
 
