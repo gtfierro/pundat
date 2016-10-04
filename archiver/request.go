@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"github.com/satori/go.uuid"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"sync"
@@ -47,33 +48,42 @@ type ArchiveRequest struct {
 
 // Print the parameters
 func (req *ArchiveRequest) Dump() {
-	fmt.Printf("PublishedBy: %s\n", req.FromVK)
-	fmt.Printf("Archiving: %s\n", req.URI)
-	fmt.Printf("Name: %s\n", req.Name)
+	fmt.Println("┌────────────────")
+	fmt.Printf("├ ")
+	color.Cyan("ARCHIVE REQUEST")
+	fmt.Printf("├ PublishedBy: %s\n", req.FromVK)
+	fmt.Printf("├ Archiving: %s\n", req.URI)
+	fmt.Printf("├ Name: %s\n", req.Name)
+	fmt.Printf("├ PO: ")
 	if req.PO > 0 {
 		fmt.Printf("Extracting PO: %s\n", bw2.PONumDotForm(req.PO))
 	} else {
 		fmt.Printf("Extracts all POs\n")
 	}
+	fmt.Printf("├ UUID: ")
 	if len(req.UUIDExpr) > 0 {
 		fmt.Printf("UUID Expression: %s\n", req.UUIDExpr)
 	} else {
 		fmt.Printf("Autogenerating UUIDs\n")
 	}
 
-	fmt.Printf("Value Expr: %s\n", req.ValueExpr)
-
+	fmt.Printf("├ Value Expr: %s\n", req.ValueExpr)
+	fmt.Println("├┌")
 	if len(req.TimeExpr) > 0 {
-		fmt.Printf("Time Expr: %s\n", req.TimeExpr)
-		fmt.Printf("Parse Time: %s\n", req.TimeParse)
+		fmt.Printf("│├ Time Expr: %s\n", req.TimeExpr)
+		fmt.Printf("│├ Parse Time: %s\n", req.TimeParse)
 	} else {
-		fmt.Printf("Using server timestamps\n")
+		fmt.Printf("│├ Using server timestamps\n")
 	}
+	fmt.Println("│└")
 
-	fmt.Println("Metadata:")
+	fmt.Printf("├ Metadata:")
 	if req.InheritMetadata {
 		fmt.Println("Inheriting metadata from URI prefixes")
+	} else {
+		fmt.Println("No metadata inheritance specified")
 	}
+	fmt.Println("└────────────────")
 }
 
 // Creates a hash of this object that is unique to its parameters. We will use the URI, PO, UUID and Name
