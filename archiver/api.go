@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"github.com/gtfierro/durandal/common"
+	"sort"
 )
 
 func (a *Archiver) SelectTags(vk string, params *common.TagParams) ([]common.MetadataGroup, error) {
@@ -14,7 +15,7 @@ func (a *Archiver) DistinctTag(vk string, params *common.DistinctParams) ([]stri
 
 // selects data for the matching streams within the range given
 // by Begin/End
-func (a *Archiver) SelectDataRange(params *common.DataParams) ([]common.Timeseries, error) {
+func (a *Archiver) SelectDataRange(vk string, params *common.DataParams) ([]common.Timeseries, error) {
 	var (
 		err    error
 		result []common.Timeseries
@@ -37,30 +38,30 @@ func (a *Archiver) SelectDataRange(params *common.DataParams) ([]common.Timeseri
 	// convert readings into the correct unit of time
 	result = a.packResults(params, result)
 
-	return result, nil
+	return a.maskTimeseriesByPermission(vk, result)
 }
 
 // selects the data point most immediately before the Start parameter for all matching streams
-func (a *Archiver) SelectDataBefore(params *common.DataParams) (result []common.Timeseries, err error) {
+func (a *Archiver) SelectDataBefore(vk string, params *common.DataParams) (result []common.Timeseries, err error) {
 	if err = a.prepareDataParams(params); err != nil {
 		return
 	}
 	result, err = a.TS.Prev(params.UUIDs, params.Begin)
 	result = a.packResults(params, result)
-	return
+	return a.maskTimeseriesByPermission(vk, result)
 }
 
 // selects the data point most immediately after the Start parameter for all matching streams
-func (a *Archiver) SelectDataAfter(params *common.DataParams) (result []common.Timeseries, err error) {
+func (a *Archiver) SelectDataAfter(vk string, params *common.DataParams) (result []common.Timeseries, err error) {
 	if err = a.prepareDataParams(params); err != nil {
 		return
 	}
 	result, err = a.TS.Next(params.UUIDs, params.Begin)
 	result = a.packResults(params, result)
-	return
+	return a.maskTimeseriesByPermission(vk, result)
 }
 
-func (a *Archiver) SelectStatisticalData(params *common.DataParams) (result []common.StatisticTimeseries, err error) {
+func (a *Archiver) SelectStatisticalData(vk string, params *common.DataParams) (result []common.StatisticTimeseries, err error) {
 	if err = a.prepareDataParams(params); err != nil {
 		return
 	}
@@ -74,7 +75,7 @@ func (a *Archiver) SelectStatisticalData(params *common.DataParams) (result []co
 		result, err = a.TS.WindowData(params.UUIDs, params.Width, params.Begin, params.End)
 	}
 	result = a.packStatsResults(params, result)
-	return
+	return a.maskStatisticTimeseriesByPermission(vk, result)
 }
 
 func (a *Archiver) GetChangedRanges(params *common.DataParams) (result []common.ChangedRange, err error) {
@@ -86,18 +87,6 @@ func (a *Archiver) GetChangedRanges(params *common.DataParams) (result []common.
 	return
 }
 
-//
-//func (a *Archiver) DeleteData(params *common.DataParams) (err error) {
-//	if err = a.prepareDataParams(params); err != nil {
-//		return
-//	}
-//	// switch order so its consistent
-//	if params.End < params.Begin {
-//		params.Begin, params.End = params.End, params.Begin
-//	}
-//	return a.TS.DeleteData(params.UUIDs, params.Begin, params.End)
-//}
-//
 func (a *Archiver) prepareDataParams(params *common.DataParams) (err error) {
 	// parse and evaluate the where clause if we need to
 	if len(params.Where) > 0 {
@@ -157,4 +146,89 @@ func (a *Archiver) packStatsResults(params *common.DataParams, readings []common
 	}
 	log.Debugf("Returning %d readings", len(readings))
 	return readings
+}
+
+func (a *Archiver) maskTimeseriesByPermission(vk string, readings []common.Timeseries) ([]common.Timeseries, error) {
+	var (
+		ret []common.Timeseries
+	)
+	// we want to mask the timeseries by the valid ranges
+	for _, ts := range readings {
+		// sort the timeseries by timestamp (earliest to most recent)
+		sort.Sort(ts)
+		uri, err := a.MD.URIFromUUID(ts.UUID)
+		if err != nil {
+			return common.EmptyTimeseries, err
+		}
+		// fetch the valid ranges for the URI that published these
+		validRanges, err := a.dotmaster.GetValidRanges(uri, vk)
+		if err != nil {
+			return common.EmptyTimeseries, err
+		}
+		newts := &common.Timeseries{
+			Generation: ts.Generation,
+			SrcURI:     uri,
+			UUID:       ts.UUID,
+		}
+		log.Info("Got ranges", validRanges)
+		for _, rng := range validRanges.Ranges {
+			// find the first index of the timeseries record that is outside the lower bound
+			earlyIndex := sort.Search(ts.Len(), func(idx int) bool {
+				return ts.Records[idx].Time.Before(rng.Start)
+			})
+			// if we find no such index, then bound by our first reading
+			if earlyIndex == ts.Len() {
+				earlyIndex = 0
+			}
+			// find the first index of the timeseries record that is outside the upperbound
+			// if we find no such index, then we are bound by our last reading
+			lastIndex := sort.Search(ts.Len(), func(idx int) bool {
+				return ts.Records[idx].Time.After(rng.End)
+			})
+			newts.Records = append(newts.Records, ts.Records[earlyIndex:lastIndex]...)
+		}
+		ret = append(ret, *newts)
+	}
+	return ret, nil
+}
+
+func (a *Archiver) maskStatisticTimeseriesByPermission(vk string, readings []common.StatisticTimeseries) ([]common.StatisticTimeseries, error) {
+	var (
+		ret []common.StatisticTimeseries
+	)
+	for _, ts := range readings {
+		sort.Sort(ts)
+		uri, err := a.MD.URIFromUUID(ts.UUID)
+		if err != nil {
+			return common.EmptyStatisticTimeseries, err
+		}
+		validRanges, err := a.dotmaster.GetValidRanges(uri, vk)
+		if err != nil {
+			return common.EmptyStatisticTimeseries, err
+		}
+		newts := &common.StatisticTimeseries{
+			Generation: ts.Generation,
+			SrcURI:     uri,
+			UUID:       ts.UUID,
+		}
+		log.Info("Got ranges", validRanges)
+		for _, rng := range validRanges.Ranges {
+			// find the first index of the timeseries record that is outside the lower bound
+			earlyIndex := sort.Search(ts.Len(), func(idx int) bool {
+				return ts.Records[idx].Time.Before(rng.Start)
+			})
+			// if we find no such index, then bound by our first reading
+			if earlyIndex == ts.Len() {
+				earlyIndex = 0
+			}
+			// find the first index of the timeseries record that is outside the upperbound
+			// if we find no such index, then we are bound by our last reading
+			lastIndex := sort.Search(ts.Len(), func(idx int) bool {
+				return ts.Records[idx].Time.After(rng.End)
+			})
+			newts.Records = append(newts.Records, ts.Records[earlyIndex:lastIndex]...)
+		}
+		ret = append(ret, *newts)
+	}
+	return ret, nil
 }

@@ -200,7 +200,7 @@ func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGrou
 	case querylang.DATA_TYPE:
 		params := parsed.GetParams().(*common.DataParams)
 		if params.IsStatistical || params.IsWindow {
-			statsResult, err = a.SelectStatisticalData(params)
+			statsResult, err = a.SelectStatisticalData(vk, params)
 			return
 		}
 		if params.IsChangedRanges {
@@ -209,13 +209,13 @@ func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGrou
 		}
 		switch parsed.Data.Dtype {
 		case querylang.IN_TYPE:
-			tsResult, err = a.SelectDataRange(params)
+			tsResult, err = a.SelectDataRange(vk, params)
 			return
 		case querylang.BEFORE_TYPE:
-			tsResult, err = a.SelectDataBefore(params)
+			tsResult, err = a.SelectDataBefore(vk, params)
 			return
 		case querylang.AFTER_TYPE:
-			tsResult, err = a.SelectDataAfter(params)
+			tsResult, err = a.SelectDataAfter(vk, params)
 			return
 		}
 	}
