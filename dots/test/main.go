@@ -6,13 +6,14 @@ import (
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"log"
 	"os"
+	"time"
 )
 
 func main() {
 	client := bw2.ConnectOrExit("")
 	client.SetEntityFromEnvironOrExit()
 
-	dm := dots.NewDotMaster(client)
+	dm := dots.NewDotMaster(client, 10*time.Second)
 
 	vk := os.Args[1]
 	uri := os.Args[2]

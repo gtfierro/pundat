@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"github.com/immesys/bw2/objects"
 	"github.com/immesys/bw2/util"
+	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"log"
 	"strings"
+	"time"
 )
 
 // the VK for the "archive" namespace
@@ -27,16 +29,27 @@ func unFmtHash(s string) []byte {
 
 type DotMaster struct {
 	client *bw2.BW2Client
+	cache  *ccache.LayeredCache
+	expiry time.Duration
 }
 
-func NewDotMaster(client *bw2.BW2Client) *DotMaster {
-	return &DotMaster{client}
+func NewDotMaster(client *bw2.BW2Client, expiry time.Duration) *DotMaster {
+	return &DotMaster{
+		client: client,
+		cache:  ccache.Layered(ccache.Configure()),
+		expiry: expiry,
+	}
 }
 
 func (dm *DotMaster) GetValidRanges(uri, vk string) (*DisjointRanges, error) {
 	var (
 		ranges = new(DisjointRanges)
 	)
+	if found := dm.cache.Get(uri, vk); found != nil && !found.Expired() {
+		// check item.expired
+		log.Printf("returning from cache for %s %s", uri, vk)
+		return found.Value().(*DisjointRanges), nil
+	}
 	accessChains, err := dm.GetAccessDOTChains(uri, vk)
 	if err != nil {
 		return ranges, err
@@ -53,7 +66,8 @@ func (dm *DotMaster) GetValidRanges(uri, vk string) (*DisjointRanges, error) {
 		rng := intersectDChainArchivalTimes(dchain)
 		ranges.Merge(rng)
 	}
-	// take the union of all the found ranges
+	// store the result in the cache
+	dm.cache.Set(uri, vk, ranges, dm.expiry)
 	return ranges, nil
 }
 
