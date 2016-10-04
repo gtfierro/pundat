@@ -63,7 +63,7 @@ func makeConfig(c *cli.Context) error {
 	}
 	fmt.Fprintln(f, "[Archiver]")
 	fmt.Fprintln(f, "PeriodicReport = true")
-	fmt.Fprintln(f, "BlockExpiry = 1")
+	fmt.Fprintln(f, "BlockExpiry = 10s")
 	fmt.Fprintln(f, "")
 	fmt.Fprintln(f, "[BOSSWAVE]")
 	fmt.Fprintln(f, "Address = 0.0.0.0:28589")

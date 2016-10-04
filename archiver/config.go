@@ -14,7 +14,7 @@ type BWConfig struct {
 
 type ARConfig struct {
 	PeriodicReport bool
-	BlockExpiry    int
+	BlockExpiry    string
 }
 
 type MDConfig struct {
