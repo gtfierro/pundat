@@ -15,6 +15,7 @@ type MetadataStore interface {
 	RemoveMetadata(VK string, tags []string, where common.Dict) error
 	MapURItoUUID(uri string, uuid common.UUID) error
 	URItoUUID(uri string) (common.UUID, error)
+	URIFromUUID(uuid common.UUID) (string, error)
 }
 
 type TimeseriesStore interface {

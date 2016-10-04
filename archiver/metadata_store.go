@@ -18,6 +18,7 @@ type mongoStore struct {
 	session  *mgo.Session
 	db       *mgo.Database
 	metadata *mgo.Collection
+	mapping  *mgo.Collection
 	records  *mgo.Collection
 	pfx      *prefix.PrefixStore
 }
@@ -38,6 +39,7 @@ func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 	m.db = m.session.DB("durandal")
 	m.metadata = m.db.C("metadata")
 	m.records = m.db.C("records")
+	m.mapping = m.db.C("mapping")
 
 	// add indexes. This will fail Fatal
 	m.addIndexes()
@@ -64,6 +66,12 @@ func (m *mongoStore) addIndexes() {
 	err = m.records.EnsureIndex(index)
 	if err != nil {
 		log.Fatalf("Could not create index on records.{srcuri,key} (%v)", err)
+	}
+
+	index.Key = []string{"uri", "uuid"}
+	err = m.mapping.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on mapping.{uri,uuid} (%v)", err)
 	}
 }
 
@@ -152,7 +160,6 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 		grouping[record.UUID.String()] = group
 	}
 	for _, group := range grouping {
-		log.Debugf("%+v", group)
 		results = append(results, *group)
 	}
 	return results, nil
@@ -238,6 +245,10 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 		return errors.Wrap(err, "Could not save mapping of uri to uuid")
 	}
 
+	if err := m.mapping.Insert(bson.M{"uuid": uuid, "uri": uri}); err != nil && !mgo.IsDup(err) {
+		return errors.Wrap(err, "Could not insert uuid,uri mapping")
+	}
+
 	// make sure we deposit the UUID in the metadata table at the *very* least
 	if err := m.metadata.Insert(bson.M{"uuid": uuid}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert UUID")
@@ -270,6 +281,18 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 	}
 
 	return nil
+}
+
+// need to get this from the actual archiverequests
+func (m *mongoStore) URIFromUUID(uuid common.UUID) (uri string, err error) {
+	var uris []string
+	if err := m.mapping.Find(bson.M{"uuid": uuid}).Distinct("uri", &uris); err != nil {
+		return "", errors.Wrapf(err, "Could not find URIs for UUID %s", uuid)
+	}
+	if len(uris) > 1 {
+		return "", errors.Errorf("Got %d URIs for UUID %s, expected 1", len(uris), uuid)
+	}
+	return uris[0], nil
 }
 
 func (m *mongoStore) URItoUUID(uri string) (common.UUID, error) {
