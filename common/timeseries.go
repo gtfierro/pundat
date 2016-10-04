@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+var EmptyTimeseries = []Timeseries{}
+var EmptyStatisticTimeseries = []StatisticTimeseries{}
+
 type TimeseriesReading struct {
 	// uint64 timestamp
 	Time time.Time
@@ -40,6 +43,19 @@ type Timeseries struct {
 	UUID       UUID
 }
 
+// sort by timestamp
+func (ts Timeseries) Len() int {
+	return len(ts.Records)
+}
+
+func (ts Timeseries) Swap(i, j int) {
+	ts.Records[i], ts.Records[j] = ts.Records[j], ts.Records[i]
+}
+
+func (ts Timeseries) Less(i, j int) bool {
+	return ts.Records[i].Time.Before(ts.Records[j].Time)
+}
+
 func (ts *Timeseries) AddRecord(rec *TimeseriesReading) {
 	ts.Lock()
 	ts.Records = append(ts.Records, rec)
@@ -70,6 +86,19 @@ func (ts *StatisticTimeseries) NumReadings() int {
 	ts.RLock()
 	defer ts.RUnlock()
 	return len(ts.Records)
+}
+
+// sort by timestamp
+func (ts StatisticTimeseries) Len() int {
+	return len(ts.Records)
+}
+
+func (ts StatisticTimeseries) Swap(i, j int) {
+	ts.Records[i], ts.Records[j] = ts.Records[j], ts.Records[i]
+}
+
+func (ts StatisticTimeseries) Less(i, j int) bool {
+	return ts.Records[i].Time.Before(ts.Records[j].Time)
 }
 
 type TimeseriesDataGroup interface {
