@@ -90,19 +90,20 @@ func doIQuery(c *cli.Context) error {
 		URI: c.String("archiver") + "/s.giles/!meta/lastalive",
 	})
 	if err != nil {
-		return err
-	}
-	for msg := range res {
-		uri, lastalive, err := getArchiverAlive(msg)
-		if err != nil {
-			log.Error(errors.Wrapf(err, "Could not retrive archiver last alive time at %s", uri))
-			continue
-		}
-		ago := time.Since(lastalive)
-		if ago.Minutes() > time.Duration(5*time.Minute).Minutes() {
-			log.Errorf("Archiver at %s last alive at %v (%v ago)", c.String("archiver"), lastalive, ago)
-		} else {
-			log.Infof("Archiver at %s last alive at %v (%v ago)", c.String("archiver"), lastalive, ago)
+		log.Error(err)
+	} else {
+		for msg := range res {
+			uri, lastalive, err := getArchiverAlive(msg)
+			if err != nil {
+				log.Error(errors.Wrapf(err, "Could not retrive archiver last alive time at %s", uri))
+				continue
+			}
+			ago := time.Since(lastalive)
+			if ago.Minutes() > time.Duration(5*time.Minute).Minutes() {
+				log.Errorf("Archiver at %s last alive at %v (%v ago)", c.String("archiver"), lastalive, ago)
+			} else {
+				log.Infof("Archiver at %s last alive at %v (%v ago)", c.String("archiver"), lastalive, ago)
+			}
 		}
 	}
 
@@ -143,7 +144,11 @@ func doIQuery(c *cli.Context) error {
 			fmt.Println(err)
 			break
 		}
-		API.Query(line)
+		err = API.Query(line)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
 	}
 	return nil
 }
