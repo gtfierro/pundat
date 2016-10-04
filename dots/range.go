@@ -3,139 +3,145 @@ package dots
 import (
 	"fmt"
 	"github.com/immesys/bw2/objects"
-	"sort"
+	"log"
+	"math"
 	"time"
 )
 
-type timeRange struct {
-	start time.Time
-	end   time.Time
+const Beginning = 0
+const EndOfTime = math.MaxInt64
+
+type TimeRange struct {
+	Start time.Time
+	End   time.Time
 }
 
-func NewTimeRange(start, end time.Time) *timeRange {
-	return &timeRange{
-		start: start,
-		end:   end,
+func NewTimeRange(start, end time.Time) *TimeRange {
+	return &TimeRange{
+		Start: start,
+		End:   end,
 	}
 }
 
 // returns true if the two time ranges do not overlap
 // if false, then they must overlap
-func (rng *timeRange) isDisjoint(rng2 *timeRange) bool {
-	return rng.end.Before(rng2.start)
+func (rng *TimeRange) IsDisjoint(rng2 *TimeRange) bool {
+	return rng.End.Before(rng2.Start)
 }
 
 // merges 2 time ranges into 1, assuming that they are NOT disjoint
-// the range on which this is called is the result, e.g. r1.mergeFrom(r2)
+// the range on which this is called is the result, e.g. r1.MergeFrom(r2)
 // will place the merged range into r1
-func (rng *timeRange) mergeFrom(rng2 *timeRange) {
-	if rng.start.After(rng2.start) {
-		rng.start = rng2.start
+func (rng *TimeRange) MergeFrom(rng2 *TimeRange) {
+	if rng.Start.After(rng2.Start) {
+		rng.Start = rng2.Start
 	}
-	if rng.end.Before(rng2.end) {
-		rng.end = rng2.end
+	if rng.End.Before(rng2.End) {
+		rng.End = rng2.End
 	}
 }
 
-func (rng *timeRange) String() string {
-	return fmt.Sprintf("Start: %s, End: %s", rng.start, rng.end)
+func (rng *TimeRange) String() string {
+	return fmt.Sprintf("Start: %s, End: %s", rng.Start, rng.End)
 }
 
 // returns true if the given time is between [start,end]
-func (rng *timeRange) contains(t time.Time) bool {
-	return (rng.start.Before(t) && rng.end.After(t)) || rng.start.Equal(t) || rng.end.Equal(t)
+func (rng *TimeRange) Contains(t time.Time) bool {
+	return (rng.Start.Before(t) && rng.End.After(t)) || rng.Start.Equal(t) || rng.End.Equal(t)
 }
 
-// assumes that DOTs are (filled), which is guaranteed by GetDOTChains
-// This will first pull the range from each DOT, where the range is defined by
-// the creation and expiration time.
-func GetTimeRanges(dchain *objects.DChain) *timeRangeCollection {
-	col := &timeRangeCollection{
-		ranges: []*timeRange{},
-	}
-	num := dchain.NumHashes()
-	for i := 0; i < num; i++ {
-		dot := dchain.GetDOT(i)
-		col.ranges = append(col.ranges, NewTimeRange(*dot.GetCreated(), *dot.GetExpiry()))
-	}
-	return col
+type DisjointRanges struct {
+	Ranges []*TimeRange
 }
 
-type timeRangeCollection struct {
-	ranges []*timeRange
-}
-
-// implementing Sort interface
-func (col *timeRangeCollection) Len() int {
-	return len(col.ranges)
-}
-
-func (col *timeRangeCollection) Swap(i, j int) {
-	col.ranges[i], col.ranges[j] = col.ranges[j], col.ranges[i]
-}
-
-func (col *timeRangeCollection) Less(i, j int) bool {
-	return col.ranges[i].start.Before(col.ranges[j].start)
-}
-
-// sorts the time ranges in order from earliest start date to latest start date
-func (col *timeRangeCollection) Sort() {
-	sort.Sort(col)
-}
-
-// merges the time ranges
-func (col *timeRangeCollection) Compress() {
-	// our "result" set
-	var compressed []*timeRange
-	// each of the ranges we have to work on
-	for _, newrng := range col.ranges {
-		var merged = false
-		// for each of the already merged ranges
-		for _, oldrng := range compressed {
-			// if our range overlaps with an existing range,
-			// we merge it, else we add the new, disjoint, range
-			// to our result list
-			if !newrng.isDisjoint(oldrng) {
-				oldrng.mergeFrom(newrng)
-				merged = true
-				break
-			}
-		}
-		if !merged {
-			compressed = append(compressed, newrng)
+// merges the given range into the set of disjoint ranges.
+// if the range overlaps with any of the existing ranges, the existing
+// range is altered to be the union of the two ranges. Else, the given
+// ranges is appended as a new disjoint range
+func (dj *DisjointRanges) Merge(rng *TimeRange) {
+	for i, oldrng := range dj.Ranges {
+		if !rng.IsDisjoint(oldrng) {
+			oldrng.MergeFrom(rng)
+			dj.Ranges[i] = oldrng
+			return
 		}
 	}
-	col.ranges = compressed
+	dj.Ranges = append(dj.Ranges, rng)
 }
 
-func (col *timeRangeCollection) String() string {
+func (dj *DisjointRanges) String() string {
 	var res string
 	res += fmt.Sprintln("\n┏")
-	for _, rng := range col.ranges {
+	for _, rng := range dj.Ranges {
 		res += fmt.Sprintln("┣", rng)
 	}
 	res += fmt.Sprintln("┗")
 	return res
 }
 
-// merges 2 collections of time ranges into a single range
-// col.mergeFrom(col2) puts results in col
-func (col *timeRangeCollection) mergeFrom(col2 *timeRangeCollection) {
-	var toadd []*timeRange
-	for _, rng := range col2.ranges {
-		var merged = false
-		for _, oldrng := range col.ranges {
-			if rng.isDisjoint(oldrng) {
-				continue
-			}
-			oldrng.mergeFrom(rng)
-			merged = true
+// takes the intersection of creation/expiry times of all DOTs on the chain
+func intersectDChainAccessTimes(dchain *objects.DChain) *TimeRange {
+	num := dchain.NumHashes()
+	if num == 0 {
+		// no hashes!
+		return nil
+	}
+	// start with initial DOT and intersect from there
+	dot := dchain.GetDOT(0)
+	rng := NewTimeRange(*dot.GetCreated(), *dot.GetExpiry())
+	// loop through the rest of the DOTs in the chain,
+	// taking the maximum creation time and the minimum expiry time
+	for i := 1; i < num; i++ {
+		dot = dchain.GetDOT(i)
+		if dot == nil {
+			panic("Why is there a nil dot in here?")
 			break
 		}
-		if !merged {
-			toadd = append(toadd, rng)
+		start := *dot.GetCreated()
+		end := *dot.GetExpiry()
+		if rng.Start.Before(start) {
+			rng.Start = start
+		}
+		if rng.End.After(end) {
+			rng.End = end
 		}
 	}
-	col.ranges = append(col.ranges, toadd...)
-	col.Sort()
+
+	return rng
+}
+
+// takes the intersection of the start/end times from URIs "archive/start/<t1>/end/<t2>/<uri>"
+func intersectDChainArchivalTimes(dchain *objects.DChain) *TimeRange {
+	num := dchain.NumHashes()
+	if num == 0 {
+		return nil
+	}
+
+	dot := dchain.GetDOT(0)
+	namespace := fmtHash(dot.GetAccessURIMVK())
+	start, end, _, err := parseArchiveURI(namespace + "/" + dot.GetAccessURISuffix())
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	rng := NewTimeRange(start, end)
+	for i := 1; i < num; i++ {
+		dot = dchain.GetDOT(i)
+		if dot == nil {
+			panic("Why is there a nil dot in here?")
+			break
+		}
+		start, end, _, err := parseArchiveURI(namespace + "/" + dot.GetAccessURISuffix())
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+		if rng.Start.Before(start) {
+			rng.Start = start
+		}
+		if rng.End.After(end) {
+			rng.End = end
+		}
+	}
+	return rng
 }
