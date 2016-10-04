@@ -3,6 +3,7 @@ package archiver
 import (
 	"fmt"
 	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/durandal/dots"
 	"github.com/gtfierro/durandal/prefix"
 	"github.com/gtfierro/durandal/querylang"
 	"github.com/op/go-logging"
@@ -10,6 +11,7 @@ import (
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"net"
 	"os"
+	"time"
 )
 
 // logger
@@ -29,9 +31,9 @@ type Archiver struct {
 	bw        *bw2.BW2Client
 	vk        string
 	MD        MetadataStore
+	dotmaster *dots.DotMaster
 	TS        TimeseriesStore
 	pfx       *prefix.PrefixStore
-	DM        *DotMaster
 	svc       *bw2.Service
 	iface     *bw2.Interface
 	vm        *viewManager
@@ -70,7 +72,12 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.vk = a.bw.SetEntityFileOrExit(c.BOSSWAVE.Entityfile)
 
 	// setup dot master
-	a.DM = NewDotMaster(a.bw, c.Archiver.BlockExpiry)
+	// parse duration
+	expiry, err := time.ParseDuration(c.Archiver.BlockExpiry)
+	if err != nil {
+		log.Fatal(errors.Wrapf(err, "Could not parse expiry duration %s", c.Archiver.BlockExpiry))
+	}
+	a.dotmaster = dots.NewDotMaster(a.bw, expiry)
 
 	a.ms = newMetadataSubscriber(a.bw, a.MD, a.pfx)
 
@@ -88,7 +95,6 @@ func NewArchiver(c *Config) (a *Archiver) {
 		log.Error(errors.Wrap(err, "Could not subscribe"))
 	}
 	log.Noticef("Listening on %s", a.iface.SlotURI("query"))
-	log.Noticef("Listening on %s", a.iface.SlotURI("subscribe"))
 	common.NewWorkerPool(queryChan, a.listenQueries, 1000).Start()
 
 	return a
