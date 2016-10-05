@@ -15,7 +15,7 @@ func POsFromMetadataGroup(nonce uint32, groups []common.MetadataGroup) bw2.Paylo
 		md := KeyValueMetadata{
 			UUID:     group.UUID.String(),
 			Metadata: make(map[string]interface{}),
-			Path:     "",
+			Path:     group.Path,
 		}
 		for _, record := range group.Records {
 			md.Metadata[record.Key] = record.Value
