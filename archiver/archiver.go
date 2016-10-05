@@ -120,6 +120,7 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 		// query message
 		query KeyValueQuery
 	)
+	start := time.Now()
 	fromVK = msg.From
 	po := msg.GetOnePODF(bw2.PODFGilesKeyValueQuery)
 	if po == nil { // no query found
@@ -150,12 +151,9 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 		}
 	}
 
+	// assemble replies
 	var reply []bw2.PayloadObject
 
-	log.Infof("Got Metadata %+v", len(mdRes))
-	log.Infof("Got Timeseries %+v", len(tsRes))
-	log.Infof("Got Statistics %+v", len(statsRes))
-	log.Infof("Got Changed %+v", len(changedRes))
 	if len(mdRes) > 0 {
 		metadataPayload := POsFromMetadataGroup(query.Nonce, mdRes)
 		reply = append(reply, metadataPayload)
@@ -171,7 +169,13 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 		reply = append(reply, changedPayload)
 	}
 
-	log.Debugf("Reply on %s: %d", a.iface.SignalURI(signalURI), len(reply))
+	// if we do not have any results, send back an empty metadata payload
+	if len(reply) == 0 {
+		metadataPayload := POsFromMetadataGroup(query.Nonce, mdRes)
+		reply = append(reply, metadataPayload)
+	}
+
+	log.Infof("Reply to %s: %d POs MD/TS/Stat/Chng (%d/%d/%d/%d) (took %s)", fromVK, len(reply), len(mdRes), len(tsRes), len(statsRes), len(changedRes), time.Since(start))
 
 	if err := a.iface.PublishSignal(signalURI, reply...); err != nil {
 		log.Error(errors.Wrap(err, "Error sending response"))

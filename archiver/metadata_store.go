@@ -124,15 +124,18 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 	)
 	selectTags := bson.M{"_id": 0}
 
+	log.Debug(where)
+
 	matchingUUIDs, err := m.GetUUIDs(VK, where)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Debug("MATCHING", matchingUUIDs)
+
 	if err := m.metadata.Find(bson.M{"uuid": bson.M{"$in": matchingUUIDs}}).Select(selectTags).All(&_results); err != nil {
 		return nil, errors.Wrap(err, "Could not select tags")
 	}
-	log.Warning(_results)
 
 	// serialize results and return
 	var (
@@ -147,6 +150,10 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 		if !found {
 			group = common.NewEmptyMetadataGroup()
 			group.UUID = record.UUID
+			group.Path, err = m.URIFromUUID(record.UUID)
+			if err != nil {
+				return results, err
+			}
 		}
 		if len(tags) > 0 {
 			for _, tag := range tags {
@@ -173,17 +180,14 @@ func (m *mongoStore) GetUUIDs(VK string, where common.Dict) ([]common.UUID, erro
 	if len(where) != 0 {
 		whereClause = where.ToBSON()
 	}
-	log.Warning(whereClause)
 	staged := m.metadata.Find(whereClause)
 	if err := staged.Distinct("uuid", &_uuids); err != nil {
 		return nil, errors.Wrap(err, "Could not select UUID")
 	}
-	log.Warning(_uuids)
 	var uuids []common.UUID
 	for _, uuid := range _uuids {
 		uuids = append(uuids, common.ParseUUID(uuid))
 	}
-	log.Warning(uuids)
 	return uuids, nil
 }
 
@@ -291,6 +295,8 @@ func (m *mongoStore) URIFromUUID(uuid common.UUID) (uri string, err error) {
 	}
 	if len(uris) > 1 {
 		return "", errors.Errorf("Got %d URIs for UUID %s, expected 1", len(uris), uuid)
+	} else if len(uris) == 0 {
+		return "", nil
 	}
 	return uris[0], nil
 }
