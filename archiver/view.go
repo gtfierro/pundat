@@ -2,7 +2,6 @@ package archiver
 
 import (
 	"encoding/base64"
-	"github.com/gtfierro/durandal/common"
 	"github.com/gtfierro/durandal/prefix"
 	"github.com/gtfierro/ob"
 	"github.com/pkg/errors"
@@ -13,11 +12,12 @@ import (
 
 // takes care of handling/parsing archive requests
 type viewManager struct {
-	client *bw2.BW2Client
-	store  MetadataStore
-	ts     TimeseriesStore
-	pfx    *prefix.PrefixStore
-	subber *metadatasubscriber
+	client   *bw2.BW2Client
+	store    MetadataStore
+	ts       TimeseriesStore
+	pfx      *prefix.PrefixStore
+	subber   *metadatasubscriber
+	incoming chan *bw2.SimpleMessage
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
 	requestHosts     *SynchronizedArchiveRequestMap
@@ -26,17 +26,68 @@ type viewManager struct {
 }
 
 func newViewManager(client *bw2.BW2Client, store MetadataStore, ts TimeseriesStore, pfx *prefix.PrefixStore, subber *metadatasubscriber) *viewManager {
-	return &viewManager{
+	vm := &viewManager{
 		client:           client,
 		store:            store,
 		ts:               ts,
 		pfx:              pfx,
 		subber:           subber,
+		incoming:         make(chan *bw2.SimpleMessage, 100),
 		namespaceAliases: make(map[string]string),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
 		requestURIs:      NewSynchronizedArchiveRequestMap(),
 		muxer:            NewSubscriberMultiplexer(client),
 	}
+	go func() {
+		for msg := range vm.incoming {
+			parts := strings.Split(msg.URI, "/")
+			key := parts[len(parts)-1]
+			if key != "giles" {
+				continue
+			}
+			var requests []*ArchiveRequest
+			for _, po := range msg.POs {
+				if !po.IsTypeDF(bw2.PODFGilesArchiveRequest) {
+					continue
+				}
+				log.Debug("get po", po.GetPODotNum(), msg.URI, po.IsTypeDF(bw2.PODFGilesArchiveRequest))
+				var request = new(ArchiveRequest)
+				err := po.(bw2.MsgPackPayloadObject).ValueInto(request)
+				if err != nil {
+					log.Error(errors.Wrap(err, "Could not parse Archive Request"))
+					continue
+				}
+				if request.PO == 0 {
+					log.Error("Request contained no PO")
+					continue
+				}
+				if len(request.Name) == 0 {
+					log.Error("Request contained no Name")
+				}
+				if request.ValueExpr == "" {
+					log.Error("Request contained no Value expression")
+					continue
+				}
+				request.FromVK = msg.From
+				if request.URI == "" { // no URI supplied
+					request.URI = strings.TrimSuffix(request.URI, "!meta/giles")
+					request.URI = strings.TrimSuffix(request.URI, "/")
+				}
+				chain, err := vm.client.BuildAnyChain(request.URI, "C", request.FromVK)
+				if err != nil || chain == nil {
+					log.Error(errors.Wrapf(err, "VK %s did not have permission to archive %s", request.FromVK, request.URI))
+					continue
+				}
+				requests = append(requests, request)
+			}
+			for _, request := range requests {
+				if err := vm.HandleArchiveRequest(request); err != nil {
+					log.Error(errors.Wrapf(err, "Could not handle archive request %+v", request))
+				}
+			}
+		}
+	}()
+	return vm
 }
 
 // Given a namespace, we subscribe to <ns>/*/!meta/giles. For each received message
@@ -73,54 +124,11 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 		log.Fatal(errors.Wrapf(err, "Could not subscribe to namespace %s", namespace))
 	}
 
-	common.NewWorkerPool(sub, func(msg *bw2.SimpleMessage) {
-		parts := strings.Split(msg.URI, "/")
-		key := parts[len(parts)-1]
-		if key != "giles" {
-			return
+	go func() {
+		for msg := range sub {
+			vm.incoming <- msg
 		}
-		var requests []*ArchiveRequest
-		// find list of existing requests at the received URI. Given the list of ones
-		// that are there NOW, we remove the extras
-		for _, po := range msg.POs {
-			if !po.IsTypeDF(bw2.PODFGilesArchiveRequest) {
-				continue
-			}
-			var request = new(ArchiveRequest)
-			err := po.(bw2.MsgPackPayloadObject).ValueInto(request)
-			if err != nil {
-				log.Error(errors.Wrap(err, "Could not parse Archive Request"))
-				continue
-			}
-			if request.PO == 0 {
-				log.Error("Request contained no PO")
-				continue
-			}
-			if len(request.Name) == 0 {
-				log.Error("Request contained no Name")
-			}
-			if request.ValueExpr == "" {
-				log.Error("Request contained no Value expression")
-				continue
-			}
-			request.FromVK = msg.From
-			if request.URI == "" { // no URI supplied
-				request.URI = strings.TrimSuffix(request.URI, "!meta/giles")
-				request.URI = strings.TrimSuffix(request.URI, "/")
-			}
-			chain, err := vm.client.BuildAnyChain(request.URI, "C", request.FromVK)
-			if err != nil || chain == nil {
-				log.Error(errors.Wrapf(err, "VK %s did not have permission to archive %s", request.FromVK, request.URI))
-				continue
-			}
-			requests = append(requests, request)
-		}
-		for _, request := range requests {
-			if err := vm.HandleArchiveRequest(request); err != nil {
-				log.Error(errors.Wrapf(err, "Could not handle archive request %+v", request))
-			}
-		}
-	}, 1000).Start()
+	}()
 
 	// handle archive requests that have already existed
 	query, err := vm.client.Query(&bw2.QueryParams{
@@ -129,9 +137,11 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 	if err != nil {
 		log.Error(errors.Wrap(err, "Could not subscribe"))
 	}
-	for msg := range query {
-		sub <- msg
-	}
+	go func() {
+		for msg := range query {
+			vm.incoming <- msg
+		}
+	}()
 }
 
 func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
