@@ -69,6 +69,7 @@ type MetadataGroup struct {
 	Records map[string]*MetadataRecord
 	// stream UUID
 	UUID UUID
+	Path string
 }
 
 func NewMetadataGroup(records ...*MetadataRecord) *MetadataGroup {
