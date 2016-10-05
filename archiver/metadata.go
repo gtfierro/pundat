@@ -28,7 +28,7 @@ func newSubscription(uri string, sub chan *bw2.SimpleMessage) *subscription {
 		refs:      1,
 		lastValue: nil,
 		sub:       sub,
-		cancel:    make(chan bool),
+		cancel:    make(chan bool, 1),
 	}
 	return s
 }
@@ -70,13 +70,11 @@ func newMetadataSubscriber(client *bw2.BW2Client, store MetadataStore, pfx *pref
 	}
 	go func() {
 		for _ = range ms.commitTimer.C {
-			ms.Lock()
 			ms.commitLock.Lock()
 			if err := ms.store.SaveMetadata(ms.uncommitted); err != nil {
 				log.Error(errors.Wrap(err, "Could not save metadata"))
 			}
 			ms.uncommitted = []*common.MetadataRecord{}
-			ms.Unlock()
 			ms.commitLock.Unlock()
 		}
 	}()
@@ -112,9 +110,9 @@ func (ms *metadatasubscriber) requestSubscription(uri string) {
 					log.Error(errors.Wrap(err, "Could not save MetadataURI"))
 				}
 				s.lastValue = rec
-				ms.Lock()
+				ms.commitLock.Lock()
 				ms.uncommitted = append(ms.uncommitted, rec)
-				ms.Unlock()
+				ms.commitLock.Unlock()
 			case <-s.cancel:
 				close(s.sub)
 				return
