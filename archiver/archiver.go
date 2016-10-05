@@ -39,7 +39,6 @@ type Archiver struct {
 	vm        *viewManager
 	ms        *metadatasubscriber
 	qp        *querylang.QueryProcessor
-	namespace string
 	config    *Config
 	stop      chan bool
 }
@@ -66,7 +65,6 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.TS = newBtrIface(&btrdbConfig{address: btrdbaddr})
 
 	// setup bosswave
-	a.namespace = c.BOSSWAVE.Namespace
 	a.bw = bw2.ConnectOrExit(c.BOSSWAVE.Address)
 	a.bw.OverrideAutoChainTo(true)
 	a.vk = a.bw.SetEntityFileOrExit(c.BOSSWAVE.Entityfile)

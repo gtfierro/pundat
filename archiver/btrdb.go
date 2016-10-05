@@ -46,6 +46,7 @@ func newBtrIface(c *btrdbConfig) *btrIface {
 		}
 		b.clients[i] = c
 	}
+	log.Notice("...connected!")
 
 	return b
 }
