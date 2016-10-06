@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"github.com/gtfierro/durandal/common"
 	"github.com/gtfierro/durandal/prefix"
+	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"net"
+	"time"
 )
 
 type mongoConfig struct {
@@ -21,12 +23,14 @@ type mongoStore struct {
 	mapping  *mgo.Collection
 	records  *mgo.Collection
 	pfx      *prefix.PrefixStore
+	uricache *ccache.Cache
 }
 
 func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 	var err error
 	m := &mongoStore{
-		pfx: pfx,
+		pfx:      pfx,
+		uricache: ccache.New(ccache.Configure()),
 	}
 	log.Noticef("Connecting to MongoDB at %v...", c.address.String())
 	m.session, err = mgo.Dial(c.address.String())
@@ -244,6 +248,9 @@ func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict)
 }
 
 func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
+	if m.uricache.Get(uri+uuid.String()) != nil {
+		return nil
+	}
 	// associate the URI with this UUID
 	if err := m.pfx.AddUUIDURIMapping(uri, uuid); err != nil {
 		return errors.Wrap(err, "Could not save mapping of uri to uuid")
@@ -283,6 +290,7 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 			}
 		}
 	}
+	m.uricache.Set(uri+uuid.String(), struct{}{}, 10*time.Minute)
 
 	return nil
 }
