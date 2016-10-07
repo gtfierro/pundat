@@ -84,11 +84,18 @@ func (m *mongoStore) addIndexes() {
 	if err != nil {
 		log.Fatalf("Could not create index on mapping.{uri,uuid} (%v)", err)
 	}
-	index.Key = []string{"uri", "uuid"}
+	index.Key = []string{"path", "uuid"}
 	err = m.documents.EnsureIndex(index)
 	if err != nil {
 		log.Fatalf("Could not create index on documents.{uri,uuid} (%v)", err)
 	}
+	//index.Key = []string{"$text:$**"}
+	//index.Unique = false
+	//index.DropDups = false
+	//err = m.documents.EnsureIndex(index)
+	//if err != nil {
+	//	log.Fatalf("Could not create text index on documents (%v)", err)
+	//}
 }
 
 func (m *mongoStore) GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error) {
@@ -265,7 +272,11 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 	bulk := m.documents.Bulk()
 	bulk.Upsert(updates...)
 	stats, err := bulk.Run()
-	log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
+	if err != nil && !mgo.IsDup(err) {
+		return errors.Wrap(err, "Could not do bulk operation")
+	} else if err == nil {
+		log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
+	}
 
 	return err
 }
