@@ -34,7 +34,7 @@ Notes here
 %token <str> DATA BEFORE AFTER LIMIT STREAMLIMIT NOW
 %token <str> LVALUE QSTRING
 %token <str> EQ NEQ COMMA ALL LEFTPIPE
-%token <str> LIKE AS
+%token <str> LIKE AS MATCHES
 %token <str> AND OR HAS NOT IN TO
 %token <str> LPAREN RPAREN LBRACK RBRACK
 %token NUMBER
@@ -334,6 +334,12 @@ whereTerm : lvalue LIKE qstring
 			{
 				$$ = common.Dict{$2: common.Dict{"$exists": true}}
 			}
+          | MATCHES qstring
+            {
+                //$$ = common.Dict{"$text": common.Dict{"$search": $2}}
+                fmt.Println( fmt.Sprintf("JSON.stringify(this).match(new RegExp('%s'))", $2))
+                $$ = common.Dict{"$where": fmt.Sprintf("JSON.stringify(this).match(new RegExp('%s'))", $2)}
+            }
           | valueListBrack IN lvalue
             {
                 $$ = common.Dict{$3: common.Dict{"$in": $1}}
@@ -470,6 +476,7 @@ func NewSQLex(s string) *sqLex {
 			{Token: AS, Pattern: "as"},
 			{Token: TO, Pattern: "to"},
 			{Token: DATA, Pattern: "data"},
+			{Token: MATCHES, Pattern: "matches"},
 			{Token: OR, Pattern: "or"},
 			{Token: IN, Pattern: "in"},
 			{Token: HAS, Pattern: "has"},
