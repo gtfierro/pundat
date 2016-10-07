@@ -107,6 +107,30 @@ func GroupFromMessage(msg *bw2.SimpleMessage) *MetadataGroup {
 	return grp
 }
 
+func GroupFromBson(doc bson.M) *MetadataGroup {
+	var grp = NewEmptyMetadataGroup()
+	if uuid, found := doc["uuid"]; found {
+		grp.UUID = ParseUUID(uuid.(string))
+		delete(doc, "uuid")
+	}
+	if path, found := doc["path"]; found {
+		grp.Path = path.(string)
+		delete(doc, "path")
+	}
+	for key, value := range doc {
+		rec := &MetadataRecord{
+			Key:   key,
+			Value: value,
+		}
+		grp.AddRecord(rec)
+	}
+	return grp
+}
+
+func (grp *MetadataGroup) IsEmpty() bool {
+	return len(grp.Records) == 0
+}
+
 func (grp *MetadataGroup) AddRecord(rec *MetadataRecord) {
 	if rec.Key == "" {
 		return
