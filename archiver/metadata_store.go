@@ -2,8 +2,8 @@ package archiver
 
 import (
 	"fmt"
-	"github.com/gtfierro/durandal/common"
-	"github.com/gtfierro/durandal/prefix"
+	"github.com/gtfierro/pundat/common"
+	"github.com/gtfierro/pundat/prefix"
 	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
@@ -46,7 +46,7 @@ func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 	}
 	log.Notice("...connected!")
 	// fetch/create collections and db reference
-	m.db = m.session.DB("durandal")
+	m.db = m.session.DB("pundat")
 	m.metadata = m.db.C("metadata")
 	m.records = m.db.C("records")
 	m.mapping = m.db.C("mapping")

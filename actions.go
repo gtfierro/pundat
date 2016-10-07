@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/gtfierro/bwquery/api"
-	"github.com/gtfierro/durandal/archiver"
+	"github.com/gtfierro/pundat/archiver"
 	"github.com/mgutz/ansi"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
@@ -42,7 +42,7 @@ func startArchiver(c *cli.Context) error {
 	if config.Archiver.PeriodicReport {
 		go func() {
 			for {
-				time.Sleep(5 * time.Second)
+				time.Sleep(10 * time.Second)
 				log.Infof("Number of active goroutines %v", runtime.NumGoroutine())
 			}
 		}()
@@ -55,7 +55,7 @@ func startArchiver(c *cli.Context) error {
 func makeConfig(c *cli.Context) error {
 	filename := c.String("file")
 	if filename == "" {
-		filename = "durandal-default.ini"
+		filename = "pundat-default.ini"
 	}
 	f, err := os.Create(filename)
 	if err != nil {

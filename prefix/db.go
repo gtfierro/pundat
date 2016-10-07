@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"github.com/boltdb/bolt"
-	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/pundat/common"
 	"github.com/pkg/errors"
 	"log"
 	"strings"

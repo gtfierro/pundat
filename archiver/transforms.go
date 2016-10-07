@@ -1,7 +1,7 @@
 package archiver
 
 import (
-	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/pundat/common"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 )
 

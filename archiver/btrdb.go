@@ -1,7 +1,7 @@
 package archiver
 
 import (
-	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/pundat/common"
 	uuidlib "github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	btrdb "gopkg.in/btrdb.v3"

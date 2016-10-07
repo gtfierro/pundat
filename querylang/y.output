@@ -140,7 +140,7 @@ state 14
 state 15
 	lvalue:  LVALUE.    (48)
 
-	.  reduce 48 (src line 363)
+	.  reduce 48 (src line 362)
 
 
 state 16
@@ -315,7 +315,7 @@ state 34
 state 35
 	whereList:  whereTerm.    (52)
 
-	.  reduce 52 (src line 387)
+	.  reduce 52 (src line 386)
 
 
 state 36
@@ -441,7 +441,7 @@ state 49
 state 50
 	qstring:  QSTRING.    (47)
 
-	.  reduce 47 (src line 357)
+	.  reduce 47 (src line 356)
 
 
 state 51
@@ -536,7 +536,7 @@ state 60
 state 61
 	whereList:  NOT whereTerm.    (51)
 
-	.  reduce 51 (src line 379)
+	.  reduce 51 (src line 378)
 
 
 state 62
@@ -718,13 +718,13 @@ state 84
 state 85
 	whereList:  whereList AND whereTerm.    (49)
 
-	.  reduce 49 (src line 371)
+	.  reduce 49 (src line 370)
 
 
 state 86
 	whereList:  whereList OR whereTerm.    (50)
 
-	.  reduce 50 (src line 375)
+	.  reduce 50 (src line 374)
 
 
 state 87
@@ -754,7 +754,7 @@ state 90
 state 91
 	whereTerm:  valueListBrack IN lvalue.    (44)
 
-	.  reduce 44 (src line 343)
+	.  reduce 44 (src line 342)
 
 
 state 92
@@ -768,7 +768,7 @@ state 92
 state 93
 	whereTerm:  LPAREN whereTerm RPAREN.    (46)
 
-	.  reduce 46 (src line 351)
+	.  reduce 46 (src line 350)
 
 
 state 94
@@ -881,7 +881,7 @@ state 107
 state 108
 	whereTerm:  valueListBrack NOT IN lvalue.    (45)
 
-	.  reduce 45 (src line 347)
+	.  reduce 45 (src line 346)
 
 
 state 109

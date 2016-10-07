@@ -7,7 +7,7 @@ import (
     "strings"
 	"fmt"
 	"github.com/taylorchu/toki"
-    "github.com/gtfierro/durandal/common"
+    "github.com/gtfierro/pundat/common"
 	"strconv"
     _time "time"
 )
@@ -337,7 +337,6 @@ whereTerm : lvalue LIKE qstring
           | MATCHES qstring
             {
                 //$$ = common.Dict{"$text": common.Dict{"$search": $2}}
-                fmt.Println( fmt.Sprintf("JSON.stringify(this).match(new RegExp('%s'))", $2))
                 $$ = common.Dict{"$where": fmt.Sprintf("JSON.stringify(this).match(new RegExp('%s'))", $2)}
             }
           | valueListBrack IN lvalue

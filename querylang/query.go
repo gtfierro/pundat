@@ -7,7 +7,7 @@ import __yyfmt__ "fmt"
 import (
 	"bufio"
 	"fmt"
-	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/pundat/common"
 	"github.com/taylorchu/toki"
 	"strconv"
 	"strings"
@@ -121,7 +121,7 @@ const sqEofCode = 1
 const sqErrCode = 2
 const sqInitialStackSize = 16
 
-//line query.y:392
+//line query.y:391
 
 const eof = 0
 
@@ -1066,36 +1066,35 @@ sqdefault:
 		//line query.y:338
 		{
 			//$$ = common.Dict{"$text": common.Dict{"$search": $2}}
-			fmt.Println(fmt.Sprintf("JSON.stringify(this).match(new RegExp('%s'))", sqDollar[2].str))
 			sqVAL.dict = common.Dict{"$where": fmt.Sprintf("JSON.stringify(this).match(new RegExp('%s'))", sqDollar[2].str)}
 		}
 	case 44:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:344
+		//line query.y:343
 		{
 			sqVAL.dict = common.Dict{sqDollar[3].str: common.Dict{"$in": sqDollar[1].list}}
 		}
 	case 45:
 		sqDollar = sqS[sqpt-4 : sqpt+1]
-		//line query.y:348
+		//line query.y:347
 		{
 			sqVAL.dict = common.Dict{sqDollar[3].str: common.Dict{"$not": common.Dict{"$in": sqDollar[1].list}}}
 		}
 	case 46:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:352
+		//line query.y:351
 		{
 			sqVAL.dict = sqDollar[2].dict
 		}
 	case 47:
 		sqDollar = sqS[sqpt-1 : sqpt+1]
-		//line query.y:358
+		//line query.y:357
 		{
 			sqVAL.str = strings.Trim(sqDollar[1].str, "\"")
 		}
 	case 48:
 		sqDollar = sqS[sqpt-1 : sqpt+1]
-		//line query.y:364
+		//line query.y:363
 		{
 
 			sqlex.(*sqLex)._keys[sqDollar[1].str] = struct{}{}
@@ -1103,19 +1102,19 @@ sqdefault:
 		}
 	case 49:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:372
+		//line query.y:371
 		{
 			sqVAL.dict = common.Dict{"$and": []common.Dict{sqDollar[1].dict, sqDollar[3].dict}}
 		}
 	case 50:
 		sqDollar = sqS[sqpt-3 : sqpt+1]
-		//line query.y:376
+		//line query.y:375
 		{
 			sqVAL.dict = common.Dict{"$or": []common.Dict{sqDollar[1].dict, sqDollar[3].dict}}
 		}
 	case 51:
 		sqDollar = sqS[sqpt-2 : sqpt+1]
-		//line query.y:380
+		//line query.y:379
 		{
 			tmp := make(common.Dict)
 			for k, v := range sqDollar[2].dict {
@@ -1125,7 +1124,7 @@ sqdefault:
 		}
 	case 52:
 		sqDollar = sqS[sqpt-1 : sqpt+1]
-		//line query.y:388
+		//line query.y:387
 		{
 			sqVAL.dict = sqDollar[1].dict
 		}

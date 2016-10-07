@@ -2,8 +2,8 @@ package archiver
 
 import (
 	"encoding/base64"
-	"github.com/gtfierro/durandal/prefix"
 	"github.com/gtfierro/ob"
+	"github.com/gtfierro/pundat/prefix"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"reflect"

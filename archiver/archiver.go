@@ -2,10 +2,10 @@ package archiver
 
 import (
 	"fmt"
-	"github.com/gtfierro/durandal/common"
-	"github.com/gtfierro/durandal/dots"
-	"github.com/gtfierro/durandal/prefix"
-	"github.com/gtfierro/durandal/querylang"
+	"github.com/gtfierro/pundat/common"
+	"github.com/gtfierro/pundat/dots"
+	"github.com/gtfierro/pundat/prefix"
+	"github.com/gtfierro/pundat/querylang"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"

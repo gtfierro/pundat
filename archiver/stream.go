@@ -1,8 +1,9 @@
 package archiver
 
 import (
-	"github.com/gtfierro/durandal/common"
+
 	"github.com/gtfierro/ob"
+	"github.com/gtfierro/pundat/common"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 	bw2 "gopkg.in/immesys/bw2bind.v5"

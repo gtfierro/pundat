@@ -42,7 +42,7 @@ func LoadConfig(filename string) *Config {
 	}
 	err = gcfg.ReadFileInto(&configuration, "./archiver.ini")
 	if err != nil {
-		log.Fatal("Could not find configuration files ./archiver.ini. Try running durandal makeconf")
+		log.Fatal("Could not find configuration files ./archiver.ini. Try running pundat makeconf")
 	} else {
 		return &configuration
 	}

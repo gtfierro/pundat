@@ -1,7 +1,7 @@
 package archiver
 
 import (
-	"github.com/gtfierro/durandal/common"
+	"github.com/gtfierro/pundat/common"
 )
 
 type MetadataStore interface {

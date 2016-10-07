@@ -10,7 +10,7 @@ import (
 var log *logging.Logger
 
 func init() {
-	log = logging.MustGetLogger("durandal")
+	log = logging.MustGetLogger("pundat")
 	var format = "%{color}%{level} %{shortfile} %{time:Jan 02 15:04:05} %{color:reset} ▶ %{message}"
 	var logBackend = logging.NewLogBackend(os.Stderr, "", 0)
 	logBackendLeveled := logging.AddModuleLevel(logBackend)
@@ -20,7 +20,7 @@ func init() {
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "Durandal"
+	app.Name = "pundat"
 	app.Version = "aleph.1"
 
 	app.Commands = []cli.Command{
@@ -37,7 +37,7 @@ func main() {
 		},
 		{
 			Name:   "mkconfig",
-			Usage:  "Creates a config file durandal-default.ini (default) in the current directory",
+			Usage:  "Creates a config file pundat-default.ini (default) in the current directory",
 			Action: makeConfig,
 			Flags: []cli.Flag{
 				cli.StringFlag{

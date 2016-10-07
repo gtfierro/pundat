@@ -1,8 +1,8 @@
 package archiver
 
 import (
-	"github.com/gtfierro/durandal/common"
-	"github.com/gtfierro/durandal/prefix"
+	"github.com/gtfierro/pundat/common"
+	"github.com/gtfierro/pundat/prefix"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"sync"
