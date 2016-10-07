@@ -12,18 +12,24 @@ import (
 	"time"
 )
 
+type groupedrecord struct {
+	UUID    string `bson:"_id"`
+	Records []bson.M
+}
+
 type mongoConfig struct {
 	address *net.TCPAddr
 }
 
 type mongoStore struct {
-	session  *mgo.Session
-	db       *mgo.Database
-	metadata *mgo.Collection
-	mapping  *mgo.Collection
-	records  *mgo.Collection
-	pfx      *prefix.PrefixStore
-	uricache *ccache.Cache
+	session   *mgo.Session
+	db        *mgo.Database
+	metadata  *mgo.Collection
+	documents *mgo.Collection
+	mapping   *mgo.Collection
+	records   *mgo.Collection
+	pfx       *prefix.PrefixStore
+	uricache  *ccache.Cache
 }
 
 func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
@@ -44,6 +50,7 @@ func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 	m.metadata = m.db.C("metadata")
 	m.records = m.db.C("records")
 	m.mapping = m.db.C("mapping")
+	m.documents = m.db.C("documents")
 
 	// add indexes. This will fail Fatal
 	m.addIndexes()
@@ -76,6 +83,11 @@ func (m *mongoStore) addIndexes() {
 	err = m.mapping.EnsureIndex(index)
 	if err != nil {
 		log.Fatalf("Could not create index on mapping.{uri,uuid} (%v)", err)
+	}
+	index.Key = []string{"uri", "uuid"}
+	err = m.documents.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on documents.{uri,uuid} (%v)", err)
 	}
 }
 
@@ -124,55 +136,38 @@ first run GetUUIDs on the where clause, and then use that list of UUIDs as the n
 */
 func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([]common.MetadataGroup, error) {
 	var (
-		_results []bson.M
+		_results    []bson.M
+		whereClause bson.M
+		results     []common.MetadataGroup
 	)
+
 	selectTags := bson.M{"_id": 0}
-
-	log.Debug(where)
-
-	matchingUUIDs, err := m.GetUUIDs(VK, where)
-	if err != nil {
-		return nil, err
+	for _, tag := range tags {
+		selectTags[tag] = 1
 	}
 
-	log.Debug("MATCHING", matchingUUIDs)
+	if len(where) != 0 {
+		whereClause = where.ToBSON()
+	}
 
-	if err := m.metadata.Find(bson.M{"uuid": bson.M{"$in": matchingUUIDs}}).Select(selectTags).All(&_results); err != nil {
+	if err := m.documents.Find(whereClause).Select(selectTags).All(&_results); err != nil {
 		return nil, errors.Wrap(err, "Could not select tags")
 	}
 
-	// serialize results and return
-	var (
-		results  []common.MetadataGroup
-		grouping = make(map[string]*common.MetadataGroup)
-		group    *common.MetadataGroup
-		found    bool
-	)
 	for _, doc := range _results {
-		record := common.RecordFromBson(doc)
-		group, found = grouping[record.UUID.String()]
-		if !found {
-			group = common.NewEmptyMetadataGroup()
-			group.UUID = record.UUID
-			group.Path, err = m.URIFromUUID(record.UUID)
+		if val, found := selectTags["uuid"]; (found && val == 1) || (len(selectTags) == 1) {
+			uri, err := m.URIFromUUID(common.ParseUUID(doc["uuid"].(string)))
 			if err != nil {
 				return results, err
 			}
+			doc["path"] = uri
 		}
-		if len(tags) > 0 {
-			for _, tag := range tags {
-				if record.Key == tag {
-					group.AddRecord(record)
-				}
-			}
-		} else {
-			group.AddRecord(record)
+		group := common.GroupFromBson(doc)
+		if !group.IsEmpty() {
+			results = append(results, *group)
 		}
-		grouping[record.UUID.String()] = group
 	}
-	for _, group := range grouping {
-		results = append(results, *group)
-	}
+
 	return results, nil
 }
 
@@ -225,6 +220,7 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		return err
 	}
 
+	var updatedUUIDs []common.UUID
 	// attempt to update records for which a mapping exists
 	for _, rec := range records {
 		// need to "duplicate" each record by each of the streams it belongs to
@@ -233,6 +229,7 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		if err != nil {
 			return err
 		}
+		updatedUUIDs = append(updatedUUIDs, uuids...)
 		for _, u := range uuids {
 			rec.UUID = u
 			if _, err := m.metadata.Upsert(bson.M{"key": rec.Key, "srcuri": rec.SrcURI, "uuid": rec.UUID}, rec); err != nil && !mgo.IsDup(err) {
@@ -240,7 +237,37 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 			}
 		}
 	}
-	return nil
+
+	// now we collect up documents so we can make queries on them
+	// only update metadata if:
+	// - it is in the list of UUIDs we have (use $match?
+	// - there is actually metadata included
+	pipe := m.metadata.Pipe([]bson.M{{"$match": bson.M{"uuid": bson.M{"$in": updatedUUIDs}}}, {"$group": bson.M{"_id": "$uuid", "records": bson.M{"$push": "$$ROOT"}}}})
+	// get iterator
+	iter := pipe.Iter()
+	var group groupedrecord
+	var updates []interface{}
+	for iter.Next(&group) {
+		doc := bson.M{"uuid": group.UUID}
+		for _, rec := range group.Records {
+			if key, found := rec["key"]; !found {
+				continue
+			} else {
+				doc[key.(string)] = rec["value"]
+			}
+		}
+		updates = append(updates, bson.M{"uuid": group.UUID})
+		updates = append(updates, bson.M{"$set": doc})
+	}
+	if err := iter.Close(); err != nil {
+		return errors.Wrap(err, "Could not close iterator")
+	}
+	bulk := m.documents.Bulk()
+	bulk.Upsert(updates...)
+	stats, err := bulk.Run()
+	log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
+
+	return err
 }
 
 func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict) error {

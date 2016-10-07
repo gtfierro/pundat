@@ -316,71 +316,31 @@ whereClause : WHERE whereList
 
 whereTerm : lvalue LIKE qstring
 			{
-                key := fixMongoKey($1)
-                if key == "uuid" {
-				  $$ = common.Dict{"uuid": common.Dict{"$regex": $3}}
-                } else {
-				  $$ = common.Dict{"key": key,"value": common.Dict{"$regex": $3}}
-                }
+				$$ = common.Dict{$1: common.Dict{"$regex": $3}}
 			}
 		  | lvalue EQ qstring
 			{
-                key := fixMongoKey($1)
-                if key == "uuid" {
-				  $$ = common.Dict{"uuid": $3}
-                } else {
-				  $$ = common.Dict{"key": key, "value":  $3}
-                }
+				$$ = common.Dict{$1: $3}
 			}
           | lvalue EQ NUMBER
             {
-                key := fixMongoKey($1)
-                if key == "uuid" {
-				  $$ = common.Dict{"uuid": $3}
-                } else {
-				  $$ = common.Dict{"key": key, "value":  $3}
-                }
+				$$ = common.Dict{$1: $3}
             }
 		  | lvalue NEQ qstring
 			{
-                key := fixMongoKey($1)
-                if key == "uuid" {
-				  $$ = common.Dict{"uuid": common.Dict{"$neq": $3}}
-                } else {
-				  $$ = common.Dict{"key": key,"value": common.Dict{"$neq": $3}}
-                }
+				$$ = common.Dict{$1: common.Dict{"$neq": $3}}
 			}
 		  | HAS lvalue
 			{
-                key := fixMongoKey($2)
-                if key == "uuid" {
-				  $$ = common.Dict{"uuid": common.Dict{"$exists": true}}
-                } else {
-				  $$ = common.Dict{"key": key}
-                }
-				//$$ = common.Dict{"$and": []common.Dict{{"key": fixMongoKey($2)}}}
-				//$$ = common.Dict{fixMongoKey($2): common.Dict{"$exists": true}}
+				$$ = common.Dict{$2: common.Dict{"$exists": true}}
 			}
           | valueListBrack IN lvalue
             {
-                key := fixMongoKey($3)
-                if key == "uuid" {
-				  $$ = common.Dict{"uuid": common.Dict{"$in": $1}}
-                } else {
-				  $$ = common.Dict{"$and": []common.Dict{{"key": fixMongoKey($3)}, {"value": common.Dict{"$in": $1}}}}
-                }
-                //$$ = common.Dict{fixMongoKey($3): common.Dict{"$in": $1}}
+                $$ = common.Dict{$3: common.Dict{"$in": $1}}
             }
           | valueListBrack NOT IN lvalue
             {
-                key := fixMongoKey($3)
-                if key == "uuid" {
-				  $$ = common.Dict{"uuid": common.Dict{"$in": $1}}
-                } else {
-				  $$ = common.Dict{"$and": []common.Dict{{"key": fixMongoKey($3)}, {"$not": common.Dict{"value": common.Dict{"$in": $1}}}}}
-                }
-				//$$ = common.Dict{"$and": []common.Dict{{"key": fixMongoKey($3)}, {"$not": common.Dict{"value": common.Dict{"$in": $1}}}}}
-                //$$ = common.Dict{fixMongoKey($3): common.Dict{"$not": common.Dict{"$in": $1}}}
+                $$ = common.Dict{$3: common.Dict{"$not": common.Dict{"$in": $1}}}
             }
           | LPAREN whereTerm RPAREN
             {
@@ -391,7 +351,6 @@ whereTerm : lvalue LIKE qstring
 qstring   : QSTRING
           {
             $$ = strings.Trim($1,"\"")
-            //$$ = $1[1:len($1)-1]
           }
           ;
 
