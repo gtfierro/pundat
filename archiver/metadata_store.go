@@ -18,7 +18,8 @@ type groupedrecord struct {
 }
 
 type mongoConfig struct {
-	address *net.TCPAddr
+	address          *net.TCPAddr
+	collectionPrefix string
 }
 
 type mongoStore struct {
@@ -47,10 +48,10 @@ func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 	log.Notice("...connected!")
 	// fetch/create collections and db reference
 	m.db = m.session.DB("pundat")
-	m.metadata = m.db.C("metadata")
-	m.records = m.db.C("records")
-	m.mapping = m.db.C("mapping")
-	m.documents = m.db.C("documents")
+	m.metadata = m.db.C(c.collectionPrefix + "metadata")
+	m.records = m.db.C(c.collectionPrefix + "records")
+	m.mapping = m.db.C(c.collectionPrefix + "mapping")
+	m.documents = m.db.C(c.collectionPrefix + "documents")
 
 	// add indexes. This will fail Fatal
 	m.addIndexes()

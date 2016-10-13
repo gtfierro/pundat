@@ -18,7 +18,8 @@ type ARConfig struct {
 }
 
 type MDConfig struct {
-	Address string
+	Address          string
+	CollectionPrefix string
 }
 
 type BTRDBConfig struct {

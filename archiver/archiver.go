@@ -56,7 +56,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	if err != nil {
 		log.Fatal(errors.Wrapf(err, "Could not resolve Metadata address %s", c.Metadata.Address))
 	}
-	a.MD = newMongoStore(&mongoConfig{address: mongoaddr}, a.pfx)
+	a.MD = newMongoStore(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix}, a.pfx)
 
 	btrdbaddr, err := net.ResolveTCPAddr("tcp4", c.BtrDB.Address)
 	if err != nil {
