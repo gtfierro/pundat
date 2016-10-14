@@ -57,11 +57,6 @@ func main() {
 					Usage:  "The entity to use",
 					EnvVar: "BW2_DEFAULT_ENTITY",
 				},
-				cli.StringFlag{
-					Name:  "archiver,a",
-					Value: "scratch.ns",
-					Usage: "REQUIRED. The base URI of the archiver you want to query",
-				},
 			},
 		},
 		{
@@ -74,11 +69,6 @@ func main() {
 					Value:  "",
 					Usage:  "The entity to use",
 					EnvVar: "BW2_DEFAULT_ENTITY",
-				},
-				cli.StringFlag{
-					Name:  "uri,u",
-					Value: "scratch.ns",
-					Usage: "The base URI of where you want to scan",
 				},
 			},
 		},

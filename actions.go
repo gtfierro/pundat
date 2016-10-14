@@ -37,6 +37,42 @@ func getArchiverAlive(msg *bw2.SimpleMessage) (string, time.Time, error) {
 	return uri, lastalive, err
 }
 
+func scan(uri, entity string) ([]string, []time.Time, error) {
+	var found []string
+	var times []time.Time
+
+	client := bw2.ConnectOrExit("")
+	client.SetEntityFileOrExit(entity)
+	client.OverrideAutoChainTo(true)
+
+	uri = strings.TrimRight(uri, "/*+")
+	stuff := strings.Split(uri, "/")
+	namespace := stuff[0]
+
+	res, err := client.Query(&bw2.QueryParams{
+		URI: uri + "/*/s.giles/!meta/lastalive",
+	})
+	if err != nil {
+		return found, times, err
+	}
+	for msg := range res {
+		uri, alive, err := getArchiverAlive(msg)
+		if err != nil {
+			log.Error(errors.Wrapf(err, "Could not retrive archiver last alive time at %s", uri))
+			continue
+		}
+		editIndex := strings.Index(uri, "/")
+		if editIndex > 0 {
+			uri = namespace + "/" + uri[editIndex+1:]
+		} else {
+			uri = namespace
+		}
+		found = append(found, uri)
+		times = append(times, alive)
+	}
+	return found, times, nil
+}
+
 func startArchiver(c *cli.Context) error {
 	config := archiver.LoadConfig(c.String("config"))
 	if config.Archiver.PeriodicReport {
@@ -74,6 +110,7 @@ func makeConfig(c *cli.Context) error {
 	fmt.Fprintln(f, "")
 	fmt.Fprintln(f, "[Metadata]")
 	fmt.Fprintln(f, "Address = 0.0.0.0:27017")
+	fmt.Fprintln(f, "CollectionPrefix = pundat")
 	fmt.Fprintln(f, "")
 	fmt.Fprintln(f, "[BtrDB]")
 	fmt.Fprintln(f, "Address = 0.0.0.0:4410")
@@ -84,10 +121,16 @@ func doIQuery(c *cli.Context) error {
 	client := bw2.ConnectOrExit("")
 	vk := client.SetEntityFileOrExit(c.String("entity"))
 	client.OverrideAutoChainTo(true)
-	API := api.NewAPI(client, vk, c.String("archiver"))
+
+	if c.NArg() == 0 {
+		return errors.New("Need to specify a namespace or URI prefix of an archiver (can use 'pundat scan' to help)")
+	}
+	archiverURI := c.Args().Get(0)
+
+	API := api.NewAPI(client, vk, archiverURI)
 
 	res, err := client.Query(&bw2.QueryParams{
-		URI: c.String("archiver") + "/s.giles/!meta/lastalive",
+		URI: archiverURI + "/s.giles/!meta/lastalive",
 	})
 	if err != nil {
 		log.Error(err)
@@ -154,33 +197,20 @@ func doIQuery(c *cli.Context) error {
 }
 
 func doScan(c *cli.Context) error {
-	client := bw2.ConnectOrExit("")
-	client.SetEntityFileOrExit(c.String("entity"))
-	client.OverrideAutoChainTo(true)
 
-	uri := strings.TrimSuffix(c.String("uri"), "/")
-	stuff := strings.Split(uri, "/")
-	namespace := stuff[0]
+	if c.NArg() == 0 {
+		return errors.New("Need to specify a namespace or URI prefix to scan")
+	}
 
-	res, err := client.Query(&bw2.QueryParams{
-		URI: uri + "/*/s.giles/!meta/lastalive",
-	})
+	archivers, times, err := scan(c.Args().Get(0), c.String("entity"))
 	if err != nil {
 		return err
 	}
-	for msg := range res {
-		uri, alive, err := getArchiverAlive(msg)
-		if err != nil {
-			log.Error(errors.Wrapf(err, "Could not retrive archiver last alive time at %s", uri))
-			continue
-		}
-		editIndex := strings.Index(uri, "/")
-		if editIndex > 0 {
-			uri = namespace + "/" + uri[editIndex+1:]
-		} else {
-			uri = namespace
-		}
+
+	for i := 0; i < len(archivers); i++ {
+		alive := times[i]
 		ago := time.Since(alive)
+		uri := archivers[i]
 		oldColor := ansi.ColorFunc("red")
 		newColor := ansi.ColorFunc("green+b")
 		if ago.Minutes() > time.Duration(5*time.Minute).Minutes() {
