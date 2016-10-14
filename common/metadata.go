@@ -128,7 +128,7 @@ func GroupFromBson(doc bson.M) *MetadataGroup {
 }
 
 func (grp *MetadataGroup) IsEmpty() bool {
-	return len(grp.Records) == 0
+	return len(grp.Records) == 0 && grp.UUID.String() == ""
 }
 
 func (grp *MetadataGroup) AddRecord(rec *MetadataRecord) {

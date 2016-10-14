@@ -163,13 +163,6 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 	}
 
 	for _, doc := range _results {
-		if val, found := selectTags["uuid"]; (found && val == 1) || (len(selectTags) == 1) {
-			uri, err := m.URIFromUUID(common.ParseUUID(doc["uuid"].(string)))
-			if err != nil {
-				return results, err
-			}
-			doc["path"] = uri
-		}
 		group := common.GroupFromBson(doc)
 		if !group.IsEmpty() {
 			results = append(results, *group)
@@ -264,6 +257,12 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 				doc[key.(string)] = rec["value"]
 			}
 		}
+		uri, err := m.URIFromUUID(common.ParseUUID(group.UUID))
+		if err != nil {
+			log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", group.UUID))
+			continue
+		}
+		doc["path"] = uri
 		updates = append(updates, bson.M{"uuid": group.UUID})
 		updates = append(updates, bson.M{"$set": doc})
 	}
@@ -299,8 +298,17 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 		return errors.Wrap(err, "Could not insert uuid,uri mapping")
 	}
 
+	// fetch URI for this UUID
+	uri, err := m.URIFromUUID(uuid)
+	if err != nil {
+		log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", uuid))
+	}
+
 	// make sure we deposit the UUID in the metadata table at the *very* least
-	if err := m.metadata.Insert(bson.M{"uuid": uuid}); err != nil && !mgo.IsDup(err) {
+	if err := m.metadata.Insert(bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
+		return errors.Wrap(err, "Could not insert UUID")
+	}
+	if err := m.documents.Insert(bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert UUID")
 	}
 
