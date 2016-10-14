@@ -2,11 +2,16 @@ package archiver
 
 import (
 	"github.com/gtfierro/pundat/common"
+	"github.com/pkg/errors"
 	"sort"
 )
 
 func (a *Archiver) SelectTags(vk string, params *common.TagParams) ([]common.MetadataGroup, error) {
-	return a.MD.GetMetadata(vk, params.Tags, params.Where)
+	groups, err := a.MD.GetMetadata(vk, params.Tags, params.Where)
+	if err != nil {
+		return nil, err
+	}
+	return a.maskMetadataGroupsByPermission(vk, groups)
 }
 
 func (a *Archiver) DistinctTag(vk string, params *common.DistinctParams) ([]string, error) {
@@ -229,6 +234,27 @@ func (a *Archiver) maskStatisticTimeseriesByPermission(vk string, readings []com
 			newts.Records = append(newts.Records, ts.Records[earlyIndex:lastIndex]...)
 		}
 		ret = append(ret, *newts)
+	}
+	return ret, nil
+}
+
+func (a *Archiver) maskMetadataGroupsByPermission(vk string, metadata []common.MetadataGroup) ([]common.MetadataGroup, error) {
+	var (
+		ret []common.MetadataGroup
+	)
+	for _, group := range metadata {
+		// need to resolve path
+		if group.Path == "" {
+			uri, err := a.MD.URIFromUUID(group.UUID)
+			if err != nil {
+				return ret, err
+			}
+			group.Path = uri
+		}
+		if err := a.dotmaster.CanRead(group.Path, vk); err != nil {
+			continue
+		}
+		ret = append(ret, group)
 	}
 	return ret, nil
 }
