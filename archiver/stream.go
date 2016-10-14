@@ -1,13 +1,13 @@
 package archiver
 
 import (
+	"time"
 
 	"github.com/gtfierro/ob"
 	"github.com/gtfierro/pundat/common"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
-	"time"
 )
 
 type Stream struct {
@@ -124,13 +124,24 @@ func (s *Stream) getTime(thing interface{}) time.Time {
 	if len(s.timeExpr) == 0 {
 		return time.Now()
 	}
-	timeString, ok := ob.Eval(s.timeExpr, thing).(string)
+	timeThing := ob.Eval(s.timeExpr, thing)
+	timeString, ok := timeThing.(string)
 	if ok {
 		parsedTime, err := time.Parse(s.timeParse, timeString)
 		if err != nil {
 			return time.Now()
 		}
 		return parsedTime
+	}
+
+	timeNum, ok := timeThing.(uint64)
+	if ok {
+		uot := common.GuessTimeUnit(timeNum)
+		i_ns, err := common.ConvertTime(timeNum, uot, common.UOT_NS)
+		if err != nil {
+			log.Error(err)
+		}
+		return time.Unix(0, int64(i_ns))
 	}
 	return time.Now()
 }
