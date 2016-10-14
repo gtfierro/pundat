@@ -41,6 +41,16 @@ func NewDotMaster(client *bw2.BW2Client, expiry time.Duration) *DotMaster {
 	}
 }
 
+// Returns nil if VK can read URI; else returns an error
+// really just a simple wrapper around buildanychain
+func (dm *DotMaster) CanRead(uri, vk string) error {
+	chain, err := dm.client.BuildAnyChain(uri, "C", vk)
+	if chain != nil && err == nil {
+		return nil
+	}
+	return errors.Wrap(err, "Could not build chain")
+}
+
 func (dm *DotMaster) GetValidRanges(uri, vk string) (*DisjointRanges, error) {
 	var (
 		ranges = new(DisjointRanges)
