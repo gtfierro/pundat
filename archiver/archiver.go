@@ -80,7 +80,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.ms = newMetadataSubscriber(a.bw, a.MD, a.pfx)
 
 	// setup view manager
-	a.vm = newViewManager(a.bw, a.MD, a.TS, a.pfx, a.ms)
+	a.vm = newViewManager(a.bw, a.vk, a.MD, a.TS, a.pfx, a.ms)
 
 	a.qp = querylang.NewQueryProcessor()
 

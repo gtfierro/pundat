@@ -1,12 +1,11 @@
 package archiver
 
 import (
-	"encoding/base64"
+	"github.com/gtfierro/bw2util"
 	"github.com/gtfierro/ob"
 	"github.com/gtfierro/pundat/prefix"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
-	"reflect"
 	"strings"
 )
 
@@ -15,6 +14,7 @@ type viewManager struct {
 	client   *bw2.BW2Client
 	store    MetadataStore
 	ts       TimeseriesStore
+	vk       string
 	pfx      *prefix.PrefixStore
 	subber   *metadatasubscriber
 	incoming chan *bw2.SimpleMessage
@@ -25,11 +25,12 @@ type viewManager struct {
 	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client, store MetadataStore, ts TimeseriesStore, pfx *prefix.PrefixStore, subber *metadatasubscriber) *viewManager {
+func newViewManager(client *bw2.BW2Client, vk string, store MetadataStore, ts TimeseriesStore, pfx *prefix.PrefixStore, subber *metadatasubscriber) *viewManager {
 	vm := &viewManager{
 		client:           client,
 		store:            store,
 		ts:               ts,
+		vk:               vk,
 		pfx:              pfx,
 		subber:           subber,
 		incoming:         make(chan *bw2.SimpleMessage, 100),
@@ -95,50 +96,34 @@ func newViewManager(client *bw2.BW2Client, store MetadataStore, ts TimeseriesSto
 func (vm *viewManager) subscribeNamespace(ns string) {
 	namespace := strings.TrimSuffix(ns, "/") + "/*/!meta/giles"
 
-	ro, _, err := vm.client.ResolveRegistry(ns)
+	c2, _ := bw2util.NewClient(vm.client, vm.vk)
+	inp, err := c2.MultiSubscribe(ns + "/*/!meta/giles")
 	if err != nil {
-		log.Fatal(errors.Wrapf(err, "Could not resolve namespace %s", ns))
+		log.Fatal(errors.Wrap(err, "Problem in multi subscribe"))
 	}
-	// OKAY so the issue here is that bw2's objects package is vendored, and runs into
-	// conflict when used with the bw2bind package. So, we cannot import the objects
-	// package. We only need the objects package to get the *objects.Entity object from
-	// the RoutingObject interface we get from calling ResolveRegistry. The reason why we
-	// need an Entity object is so we can call its GetVK() method to get the namespace VK
-	// that is mapped to by the alias we threw into ResolveRegistry.
-	// Because the underlying object actually is an entity object, we can use the reflect
-	// package to just call the method directly without having to import the objects
-	// package to do the type conversion (e.g. ro.(*object.Entity).GetVK()).
-	// The rest is just reflection crap: call the method using f.Call() using []reflect.Value
-	// to indicate an empty arguments list. We use [0] to get the first (and only) result,
-	// and call .Bytes() to return the underlying byte array returned by GetVK(). We
-	// then interpret it using base64 urlsafe encoding to get the string value.
-	f := reflect.ValueOf(ro).MethodByName("GetVK")
-	nsvk := base64.URLEncoding.EncodeToString(f.Call([]reflect.Value{})[0].Bytes())
-	vm.namespaceAliases[namespace] = nsvk
-	log.Noticef("Resolved alias %s -> %s", namespace, nsvk)
 	log.Noticef("Subscribe to %s", namespace)
-	sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
-		URI: namespace,
-	})
-	if err != nil {
-		log.Fatal(errors.Wrapf(err, "Could not subscribe to namespace %s", namespace))
-	}
+	//sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
+	//	URI: namespace,
+	//})
+	//if err != nil {
+	//	log.Fatal(errors.Wrapf(err, "Could not subscribe to namespace %s", namespace))
+	//}
 
-	go func() {
-		for msg := range sub {
-			vm.incoming <- msg
-		}
-	}()
+	//go func() {
+	//	for msg := range sub {
+	//		vm.incoming <- msg
+	//	}
+	//}()
 
-	// handle archive requests that have already existed
-	query, err := vm.client.Query(&bw2.QueryParams{
-		URI: namespace,
-	})
-	if err != nil {
-		log.Error(errors.Wrap(err, "Could not subscribe"))
-	}
+	//// handle archive requests that have already existed
+	//query, err := vm.client.Query(&bw2.QueryParams{
+	//	URI: namespace,
+	//})
+	//if err != nil {
+	//	log.Error(errors.Wrap(err, "Could not subscribe"))
+	//}
 	go func() {
-		for msg := range query {
+		for msg := range inp {
 			vm.incoming <- msg
 		}
 	}()
