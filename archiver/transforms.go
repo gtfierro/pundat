@@ -2,7 +2,7 @@ package archiver
 
 import (
 	"github.com/gtfierro/pundat/common"
-	bw2 "gopkg.in/immesys/bw2bind.v5"
+	bw2 "github.com/immesys/bw2bind"
 )
 
 func POsFromMetadataGroup(nonce uint32, groups []common.MetadataGroup) bw2.PayloadObject {

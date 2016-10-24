@@ -2,7 +2,7 @@ package archiver
 
 import (
 	"github.com/pkg/errors"
-	bw2 "gopkg.in/immesys/bw2bind.v5"
+	bw2 "github.com/immesys/bw2bind"
 	"strings"
 	"sync"
 )

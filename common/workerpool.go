@@ -1,7 +1,7 @@
 package common
 
 import (
-	bw "gopkg.in/immesys/bw2bind.v5"
+	bw "github.com/immesys/bw2bind"
 )
 
 func worker(in chan *bw.SimpleMessage, cb func(msg *bw.SimpleMessage)) {

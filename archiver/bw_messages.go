@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gtfierro/giles2/common"
-	bw2 "gopkg.in/immesys/bw2bind.v5"
+	bw2 "github.com/immesys/bw2bind"
 	"math"
 )
 

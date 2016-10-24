@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/satori/go.uuid"
-	bw2 "gopkg.in/immesys/bw2bind.v5"
+	bw2 "github.com/immesys/bw2bind"
 	"sync"
 )
 

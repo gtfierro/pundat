@@ -8,7 +8,7 @@ import (
 	"github.com/gtfierro/pundat/querylang"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
-	bw2 "gopkg.in/immesys/bw2bind.v5"
+	bw2 "github.com/immesys/bw2bind"
 	"net"
 	"os"
 	"time"
