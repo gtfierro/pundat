@@ -2,9 +2,12 @@ package archiver
 
 import (
 	"github.com/gtfierro/pundat/common"
-	"github.com/pkg/errors"
 	"sort"
 )
+
+// how to do metadata DOT protection? run the query; if there is a uuid or path, we
+// then see if we can build a chain to the path (or translate uuid into a uri); if that is
+// the case, then we return, else we don't.
 
 func (a *Archiver) SelectTags(vk string, params *common.TagParams) ([]common.MetadataGroup, error) {
 	groups, err := a.MD.GetMetadata(vk, params.Tags, params.Where)
