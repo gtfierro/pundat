@@ -178,7 +178,7 @@ func (a *Archiver) maskTimeseriesByPermission(vk string, readings []common.Times
 			SrcURI:     uri,
 			UUID:       ts.UUID,
 		}
-		log.Info("Got ranges", validRanges)
+		log.Infof("Got ranges (VK=%s, UUID=%s)%s", vk, ts.UUID, validRanges)
 		for _, rng := range validRanges.Ranges {
 			// find the first index of the timeseries record that is outside the lower bound
 			earlyIndex := sort.Search(ts.Len(), func(idx int) bool {
@@ -219,7 +219,7 @@ func (a *Archiver) maskStatisticTimeseriesByPermission(vk string, readings []com
 			SrcURI:     uri,
 			UUID:       ts.UUID,
 		}
-		log.Info("Got ranges", validRanges)
+		log.Infof("Got ranges (VK=%s, UUID=%s)%s", vk, ts.UUID, validRanges)
 		for _, rng := range validRanges.Ranges {
 			// find the first index of the timeseries record that is outside the lower bound
 			earlyIndex := sort.Search(ts.Len(), func(idx int) bool {
