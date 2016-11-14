@@ -63,7 +63,6 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 	if err != nil {
 		return
 	}
-	fmt.Println("looking for", nonce)
 	for msg := range c {
 		errfound, err = getError(nonce, msg)
 		if errfound {
@@ -82,7 +81,6 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 			return
 		}
 		if tsfound || mdfound || chfound {
-			fmt.Println(tag)
 			err = pc.client.Unsubscribe(tag)
 			if err != nil {
 				return
@@ -136,7 +134,6 @@ func getTimeseries(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryTim
 		timeseriesResults messages.QueryTimeseriesResult
 	)
 	if po = msg.GetOnePODF(bw.PODFGilesTimeseriesResponse); po != nil {
-		fmt.Println("found ts", nonce)
 		if err := po.(bw.MsgPackPayloadObject).ValueInto(&timeseriesResults); err != nil {
 			return false, timeseriesResults, err
 		}
