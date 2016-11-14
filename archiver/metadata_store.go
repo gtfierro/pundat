@@ -180,7 +180,7 @@ func (m *mongoStore) GetUUIDs(VK string, where common.Dict) ([]common.UUID, erro
 	if len(where) != 0 {
 		whereClause = where.ToBSON()
 	}
-	staged := m.metadata.Find(whereClause)
+	staged := m.documents.Find(whereClause)
 	if err := staged.Distinct("uuid", &_uuids); err != nil {
 		return nil, errors.Wrap(err, "Could not select UUID")
 	}
