@@ -38,6 +38,7 @@ func NewPundatClient(client *bw.BW2Client, vk string, uri string) *PundatClient 
 func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult, tsRes messages.QueryTimeseriesResult, chRes messages.QueryChangedResult, err error) {
 	var (
 		c        chan *bw.SimpleMessage
+		tag      string
 		tsfound  bool
 		mdfound  bool
 		chfound  bool
@@ -48,7 +49,7 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 		Query: query,
 		Nonce: nonce,
 	}
-	c, err = pc.client.Subscribe(&bw.SubscribeParams{
+	c, tag, err = pc.client.SubscribeH(&bw.SubscribeParams{
 		URI: pc.uri + fmt.Sprintf("/signal/%s,queries", pc.vk[:len(pc.vk)-1]),
 	})
 	if err != nil {
@@ -64,23 +65,28 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 	}
 	fmt.Println("looking for", nonce)
 	for msg := range c {
-		errfound, err = GetError(nonce, msg)
+		errfound, err = getError(nonce, msg)
 		if errfound {
 			return
 		}
-		tsfound, tsRes, err = GetTimeseries(nonce, msg)
+		tsfound, tsRes, err = getTimeseries(nonce, msg)
 		if err != nil {
 			return
 		}
-		mdfound, mdRes, err = GetMetadata(nonce, msg)
+		mdfound, mdRes, err = getMetadata(nonce, msg)
 		if err != nil {
 			return
 		}
-		chfound, chRes, err = GetChanged(nonce, msg)
+		chfound, chRes, err = getChanged(nonce, msg)
 		if err != nil {
 			return
 		}
 		if tsfound || mdfound || chfound {
+			fmt.Println(tag)
+			err = pc.client.Unsubscribe(tag)
+			if err != nil {
+				return
+			}
 			break
 		}
 	}
@@ -88,7 +94,7 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 }
 
 // Extracts QueryError from Giles response. Returns false if no related message was found
-func GetError(nonce uint32, msg *bw.SimpleMessage) (bool, error) {
+func getError(nonce uint32, msg *bw.SimpleMessage) (bool, error) {
 	var (
 		po         bw.PayloadObject
 		queryError messages.QueryError
@@ -106,7 +112,7 @@ func GetError(nonce uint32, msg *bw.SimpleMessage) (bool, error) {
 }
 
 // Extracts Metadata from Giles response. Returns false if no related message was found
-func GetMetadata(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryMetadataResult, error) {
+func getMetadata(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryMetadataResult, error) {
 	var (
 		po              bw.PayloadObject
 		metadataResults messages.QueryMetadataResult
@@ -124,7 +130,7 @@ func GetMetadata(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryMetad
 }
 
 // Extracts Timeseries from Giles response. Returns false if no related message was found
-func GetTimeseries(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryTimeseriesResult, error) {
+func getTimeseries(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryTimeseriesResult, error) {
 	var (
 		po                bw.PayloadObject
 		timeseriesResults messages.QueryTimeseriesResult
@@ -143,7 +149,7 @@ func GetTimeseries(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryTim
 }
 
 // Extracts Timeseries from Giles response. Returns false if no related message was found
-func GetChanged(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryChangedResult, error) {
+func getChanged(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryChangedResult, error) {
 	var (
 		po             bw.PayloadObject
 		changedResults messages.QueryChangedResult
