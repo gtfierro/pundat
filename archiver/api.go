@@ -91,7 +91,6 @@ func (a *Archiver) GetChangedRanges(params *common.DataParams) (result []common.
 		return
 	}
 	result, err = a.TS.ChangedRanges(params.UUIDs, params.FromGen, params.ToGen, params.Resolution)
-	log.Warning("CHANGED RANGES", result)
 	return
 }
 

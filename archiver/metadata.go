@@ -3,8 +3,8 @@ package archiver
 import (
 	"github.com/gtfierro/pundat/common"
 	"github.com/gtfierro/pundat/prefix"
-	"github.com/pkg/errors"
 	bw2 "github.com/immesys/bw2bind"
+	"github.com/pkg/errors"
 	"sync"
 	"time"
 )

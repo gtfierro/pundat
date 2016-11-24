@@ -5,9 +5,9 @@ import (
 
 	"github.com/gtfierro/ob"
 	"github.com/gtfierro/pundat/common"
+	bw2 "github.com/immesys/bw2bind"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
-	bw2 "github.com/immesys/bw2bind"
 )
 
 type Stream struct {
@@ -99,15 +99,26 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					for _, _val := range value_list {
 						value_f64, ok := _val.(float64)
 						if !ok {
-							log.Errorf("Value %+v was not a float64 from %+v", value)
-							continue
+							if value_u64, ok := value.(uint64); ok {
+								value_f64 = float64(value_u64)
+							} else if value_i64, ok := value.(int64); ok {
+								value_f64 = float64(value_i64)
+							} else {
+								log.Errorf("Value %+v was not a float64 (was %T)", value, value)
+							}
 						}
 						ts.Records = append(ts.Records, &common.TimeseriesReading{Time: time, Value: value_f64})
 					}
 				} else {
 					value_f64, ok := value.(float64)
 					if !ok {
-						log.Errorf("Value %+v was not a float64 (was %T)", value, value)
+						if value_u64, ok := value.(uint64); ok {
+							value_f64 = float64(value_u64)
+						} else if value_i64, ok := value.(int64); ok {
+							value_f64 = float64(value_i64)
+						} else {
+							log.Errorf("Value %+v was not a float64 (was %T)", value, value)
+						}
 						continue
 					}
 					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: time, Value: value_f64})
