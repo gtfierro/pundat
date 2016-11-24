@@ -218,7 +218,7 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 	}
 	err := m.records.Insert(inserts...)
 	if err != nil && !mgo.IsDup(err) {
-		return err
+		return errors.Wrap(err, "Could not insert")
 	}
 
 	var updatedUUIDs []common.UUID
@@ -228,13 +228,13 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		stripped := StripBangMeta(rec.SrcURI)
 		uuids, err := m.pfx.GetUUIDsFromURI(stripped)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Could not get UUIDs from URI")
 		}
 		updatedUUIDs = append(updatedUUIDs, uuids...)
 		for _, u := range uuids {
 			rec.UUID = u
 			if _, err := m.metadata.Upsert(bson.M{"key": rec.Key, "srcuri": rec.SrcURI, "uuid": rec.UUID}, rec); err != nil && !mgo.IsDup(err) {
-				return err
+				return errors.Wrap(err, "Could not upsert")
 			}
 		}
 	}
@@ -271,13 +271,19 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 	}
 	bulk := m.documents.Bulk()
 	bulk.Upsert(updates...)
-	stats, err := bulk.Run()
+	_, err = bulk.Run()
 	if err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not do bulk operation")
 	} else if err == nil {
-		log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
+		//log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
 	}
 
+	// handle bulk error case from mongo
+	if be, ok := err.(*mgo.BulkError); ok {
+		if len(be.Cases()) == 0 {
+			return nil
+		}
+	}
 	return err
 }
 
