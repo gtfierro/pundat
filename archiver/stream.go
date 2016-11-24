@@ -95,14 +95,7 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					continue
 				}
 
-				metadataRecord := []*common.MetadataRecord{{
-					Key:       "_name",
-					Value:     s.name,
-					SrcURI:    msg.URI,
-					TimeValid: time.Now(),
-					UUID:      currentUUID,
-				}}
-				if err := metadataStore.SaveMetadata(metadataRecord); err != nil {
+				if err := metadataStore.AddNameTag(s.name, currentUUID); err != nil {
 					log.Error(err)
 					continue
 				}

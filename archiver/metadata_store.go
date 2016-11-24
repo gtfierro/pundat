@@ -287,6 +287,19 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 	return err
 }
 
+func (m *mongoStore) AddNameTag(name string, uuid common.UUID) error {
+	updateFilter := bson.M{
+		"uuid": uuid,
+	}
+	updateContents := bson.M{
+		"$set": bson.M{"_name": name},
+	}
+	if err := m.documents.Update(updateFilter, updateContents); err != nil && !mgo.IsDup(err) {
+		return err
+	}
+	return nil
+}
+
 func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict) error {
 	return nil
 }

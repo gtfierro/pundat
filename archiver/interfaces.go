@@ -11,6 +11,7 @@ type MetadataStore interface {
 	GetUUIDs(VK string, where common.Dict) ([]common.UUID, error)
 
 	SaveMetadata(records []*common.MetadataRecord) error
+	AddNameTag(name string, uuid common.UUID) error
 
 	RemoveMetadata(VK string, tags []string, where common.Dict) error
 	MapURItoUUID(uri string, uuid common.UUID) error
