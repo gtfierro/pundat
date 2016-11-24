@@ -66,9 +66,12 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 
 				// extract the possible value
 				value := ob.Eval(s.valueExpr, thing)
+				if value == nil {
+					continue
+				}
 
 				// extract the time
-				time := s.getTime(thing)
+				timestamp := s.getTime(thing)
 
 				// if we have an expression to extract a UUID, we use that
 				var currentUUID common.UUID
@@ -92,6 +95,18 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					continue
 				}
 
+				metadataRecord := []*common.MetadataRecord{{
+					Key:       "_name",
+					Value:     s.name,
+					SrcURI:    msg.URI,
+					TimeValid: time.Now(),
+					UUID:      currentUUID,
+				}}
+				if err := metadataStore.SaveMetadata(metadataRecord); err != nil {
+					log.Error(err)
+					continue
+				}
+
 				// generate the timeseries values from our extracted value, and then save it
 				// test if the value is a list
 				ts.Records = []*common.TimeseriesReading{}
@@ -107,7 +122,7 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 								log.Errorf("Value %+v was not a float64 (was %T)", value, value)
 							}
 						}
-						ts.Records = append(ts.Records, &common.TimeseriesReading{Time: time, Value: value_f64})
+						ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 					}
 				} else {
 					value_f64, ok := value.(float64)
@@ -121,7 +136,7 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 						}
 						continue
 					}
-					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: time, Value: value_f64})
+					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 				}
 				if err := timeseriesStore.AddReadings(ts); err != nil {
 					log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
