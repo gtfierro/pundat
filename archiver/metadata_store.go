@@ -58,54 +58,71 @@ func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 
 	go func() {
 		for _ = range time.Tick(10 * time.Second) {
-			pipe := m.metadata.Pipe([]bson.M{{"$match": bson.M{"uuid": bson.M{"$exists": true}}}, {"$group": bson.M{"_id": "$uuid", "records": bson.M{"$push": "$$ROOT"}}}})
-			// get iterator
-			iter := pipe.Iter()
-			var group groupedrecord
-			var updates []interface{}
-			for iter.Next(&group) {
-				doc := bson.M{"uuid": group.UUID}
-				for _, rec := range group.Records {
-					if key, found := rec["key"]; !found {
-						continue
-					} else {
-						doc[key.(string)] = rec["value"]
-					}
-				}
-				uri, err := m.URIFromUUID(common.ParseUUID(group.UUID))
-				if err != nil {
-					log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", group.UUID))
-					continue
-				}
-				doc["path"] = uri
-				updates = append(updates, bson.M{"uuid": group.UUID})
-				updates = append(updates, bson.M{"$set": doc})
-			}
-			if err := iter.Close(); err != nil {
-				log.Error(errors.Wrap(err, "Could not close iterator"))
-				continue
-			}
-			log.Noticef("Updating metadata: %d updates", len(updates))
-			bulk := m.documents.Bulk()
-			bulk.Upsert(updates...)
-			_, err = bulk.Run()
-			if err != nil && !mgo.IsDup(err) {
-				log.Error(errors.Wrap(err, "Could not do bulk operation"))
-				continue
-			} else if err == nil {
-				//log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
-			}
-
-			// handle bulk error case from mongo
-			if be, ok := err.(*mgo.BulkError); ok {
-				if len(be.Cases()) == 0 {
-					continue
-				}
-			}
+			var allUUIDs []string
+			err := m.metadata.Find(bson.M{}).Distinct("uuid", &allUUIDs)
 			if err != nil {
 				log.Error(err)
+				continue
 			}
-			continue
+			startBlock := 0
+			step := 1000
+			endBlock := startBlock + step
+			for startBlock < len(allUUIDs) {
+				if endBlock > len(allUUIDs) {
+					endBlock = len(allUUIDs)
+				}
+				log.Debug(startBlock, endBlock, len(allUUIDs))
+				batch := allUUIDs[startBlock:endBlock]
+				startBlock += step
+				endBlock += step
+				pipe := m.metadata.Pipe([]bson.M{{"$match": bson.M{"uuid": bson.M{"$in": batch}}}, {"$group": bson.M{"_id": "$uuid", "records": bson.M{"$push": "$$ROOT"}}}})
+				// get iterator
+				iter := pipe.Iter()
+				var group groupedrecord
+				var updates []interface{}
+				for iter.Next(&group) {
+					doc := bson.M{"uuid": group.UUID}
+					for _, rec := range group.Records {
+						if key, found := rec["key"]; !found {
+							continue
+						} else {
+							doc[key.(string)] = rec["value"]
+						}
+					}
+					uri, err := m.URIFromUUID(common.ParseUUID(group.UUID))
+					if err != nil {
+						log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", group.UUID))
+						continue
+					}
+					doc["path"] = uri
+					updates = append(updates, bson.M{"uuid": group.UUID})
+					updates = append(updates, bson.M{"$set": doc})
+				}
+				if err := iter.Close(); err != nil {
+					log.Error(errors.Wrap(err, "Could not close iterator"))
+					continue
+				}
+				log.Noticef("Updating metadata: %d updates", len(updates))
+				bulk := m.documents.Bulk()
+				bulk.Upsert(updates...)
+				_, err = bulk.Run()
+				if err != nil && !mgo.IsDup(err) {
+					log.Error(errors.Wrap(err, "Could not do bulk operation"))
+					continue
+				} else if err == nil {
+					//log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
+				}
+
+				// handle bulk error case from mongo
+				if be, ok := err.(*mgo.BulkError); ok {
+					if len(be.Cases()) == 0 {
+						continue
+					}
+				}
+				if err != nil {
+					log.Error(err)
+				}
+			}
 		}
 	}()
 
