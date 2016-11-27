@@ -56,6 +56,59 @@ func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
 	// add indexes. This will fail Fatal
 	m.addIndexes()
 
+	go func() {
+		for _ = range time.Tick(10 * time.Second) {
+			pipe := m.metadata.Pipe([]bson.M{{"$match": bson.M{"uuid": bson.M{"$exists": true}}}, {"$group": bson.M{"_id": "$uuid", "records": bson.M{"$push": "$$ROOT"}}}})
+			// get iterator
+			iter := pipe.Iter()
+			var group groupedrecord
+			var updates []interface{}
+			for iter.Next(&group) {
+				doc := bson.M{"uuid": group.UUID}
+				for _, rec := range group.Records {
+					if key, found := rec["key"]; !found {
+						continue
+					} else {
+						doc[key.(string)] = rec["value"]
+					}
+				}
+				uri, err := m.URIFromUUID(common.ParseUUID(group.UUID))
+				if err != nil {
+					log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", group.UUID))
+					continue
+				}
+				doc["path"] = uri
+				updates = append(updates, bson.M{"uuid": group.UUID})
+				updates = append(updates, bson.M{"$set": doc})
+			}
+			if err := iter.Close(); err != nil {
+				log.Error(errors.Wrap(err, "Could not close iterator"))
+				continue
+			}
+			log.Noticef("Updating metadata: %d updates", len(updates))
+			bulk := m.documents.Bulk()
+			bulk.Upsert(updates...)
+			_, err = bulk.Run()
+			if err != nil && !mgo.IsDup(err) {
+				log.Error(errors.Wrap(err, "Could not do bulk operation"))
+				continue
+			} else if err == nil {
+				//log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
+			}
+
+			// handle bulk error case from mongo
+			if be, ok := err.(*mgo.BulkError); ok {
+				if len(be.Cases()) == 0 {
+					continue
+				}
+			}
+			if err != nil {
+				log.Error(err)
+			}
+			continue
+		}
+	}()
+
 	return m
 }
 
@@ -327,7 +380,7 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 	if err := m.metadata.Insert(bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert UUID")
 	}
-	if err := m.documents.Insert(bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
+	if _, err := m.documents.Upsert(bson.M{"uuid": uuid}, bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert UUID")
 	}
 
@@ -370,7 +423,7 @@ func (m *mongoStore) URIFromUUID(uuid common.UUID) (uri string, err error) {
 	if len(uris) > 1 {
 		return "", errors.Errorf("Got %d URIs for UUID %s, expected 1", len(uris), uuid)
 	} else if len(uris) == 0 {
-		return "", nil
+		return "", errors.Errorf("no URI found")
 	}
 	return uris[0], nil
 }
