@@ -2,7 +2,6 @@ package archiver
 
 import (
 	"github.com/gtfierro/pundat/common"
-	"github.com/gtfierro/pundat/prefix"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/pkg/errors"
 	"sync"
@@ -52,7 +51,6 @@ func (sub *subscription) dec() {
 type metadatasubscriber struct {
 	client        *bw2.BW2Client
 	store         MetadataStore
-	pfx           *prefix.PrefixStore
 	subscriptions map[string]*subscription
 	uncommitted   []*common.MetadataRecord
 	commitLock    sync.Mutex
@@ -60,11 +58,10 @@ type metadatasubscriber struct {
 	sync.RWMutex
 }
 
-func newMetadataSubscriber(client *bw2.BW2Client, store MetadataStore, pfx *prefix.PrefixStore) *metadatasubscriber {
+func newMetadataSubscriber(client *bw2.BW2Client, store MetadataStore) *metadatasubscriber {
 	ms := &metadatasubscriber{
 		client:        client,
 		store:         store,
-		pfx:           pfx,
 		subscriptions: make(map[string]*subscription),
 		commitTimer:   time.NewTicker(5 * time.Second),
 	}
@@ -106,10 +103,6 @@ func (ms *metadatasubscriber) requestSubscription(uri string) {
 				if rec == nil {
 					continue
 				}
-				if err := ms.pfx.AddMetadataURI(msg.URI); err != nil {
-					log.Error(errors.Wrap(err, "Could not save MetadataURI"))
-				}
-				s.lastValue = rec
 				ms.commitLock.Lock()
 				ms.uncommitted = append(ms.uncommitted, rec)
 				ms.commitLock.Unlock()

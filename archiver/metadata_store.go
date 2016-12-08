@@ -3,7 +3,6 @@ package archiver
 import (
 	"fmt"
 	"github.com/gtfierro/pundat/common"
-	"github.com/gtfierro/pundat/prefix"
 	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
@@ -23,21 +22,25 @@ type mongoConfig struct {
 }
 
 type mongoStore struct {
-	session   *mgo.Session
-	db        *mgo.Database
-	metadata  *mgo.Collection
-	documents *mgo.Collection
-	mapping   *mgo.Collection
-	records   *mgo.Collection
-	pfx       *prefix.PrefixStore
-	uricache  *ccache.Cache
+	session           *mgo.Session
+	db                *mgo.Database
+	metadata          *mgo.Collection
+	documents         *mgo.Collection
+	mapping           *mgo.Collection
+	prefixRecords     *mgo.Collection
+	prefixRecordsLock sync.Mutex
+
+	uricache *ccache.Cache
+
+	updatedPrefixes     map[string]struct{}
+	updatedPrefixesLock sync.Mutex
 }
 
-func newMongoStore(c *mongoConfig, pfx *prefix.PrefixStore) *mongoStore {
+func newMongoStore(c *mongoConfig) *mongoStore {
 	var err error
 	m := &mongoStore{
-		pfx:      pfx,
-		uricache: ccache.New(ccache.Configure()),
+		uricache:        ccache.New(ccache.Configure()),
+		updatedPrefixes: make(map[string]struct{}),
 	}
 	log.Noticef("Connecting to MongoDB at %v...", c.address.String())
 	m.session, err = mgo.Dial(c.address.String())

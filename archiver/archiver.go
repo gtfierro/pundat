@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gtfierro/pundat/common"
 	"github.com/gtfierro/pundat/dots"
-	"github.com/gtfierro/pundat/prefix"
 	"github.com/gtfierro/pundat/querylang"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/op/go-logging"
@@ -33,7 +32,6 @@ type Archiver struct {
 	MD        MetadataStore
 	dotmaster *dots.DotMaster
 	TS        TimeseriesStore
-	pfx       *prefix.PrefixStore
 	svc       *bw2.Service
 	iface     *bw2.Interface
 	vm        *viewManager
@@ -48,15 +46,13 @@ func NewArchiver(c *Config) (a *Archiver) {
 		config: c,
 		stop:   make(chan bool),
 	}
-	// setup prefix store
-	a.pfx = prefix.NewPrefixStore(".pfx.db")
 
 	// setup metadata
 	mongoaddr, err := net.ResolveTCPAddr("tcp4", c.Metadata.Address)
 	if err != nil {
 		log.Fatal(errors.Wrapf(err, "Could not resolve Metadata address %s", c.Metadata.Address))
 	}
-	a.MD = newMongoStore(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix}, a.pfx)
+	a.MD = newMongoStore(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix})
 
 	btrdbaddr, err := net.ResolveTCPAddr("tcp4", c.BtrDB.Address)
 	if err != nil {
@@ -77,10 +73,10 @@ func NewArchiver(c *Config) (a *Archiver) {
 	}
 	a.dotmaster = dots.NewDotMaster(a.bw, expiry)
 
-	a.ms = newMetadataSubscriber(a.bw, a.MD, a.pfx)
+	a.ms = newMetadataSubscriber(a.bw, a.MD)
 
 	// setup view manager
-	a.vm = newViewManager(a.bw, a.vk, a.MD, a.TS, a.pfx, a.ms)
+	a.vm = newViewManager(a.bw, a.vk, a.MD, a.TS, a.ms)
 
 	a.qp = querylang.NewQueryProcessor()
 

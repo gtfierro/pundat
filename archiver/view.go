@@ -3,9 +3,8 @@ package archiver
 import (
 	"github.com/gtfierro/bw2util"
 	"github.com/gtfierro/ob"
-	"github.com/gtfierro/pundat/prefix"
-	"github.com/pkg/errors"
 	bw2 "github.com/immesys/bw2bind"
+	"github.com/pkg/errors"
 	"strings"
 )
 
@@ -15,7 +14,6 @@ type viewManager struct {
 	store    MetadataStore
 	ts       TimeseriesStore
 	vk       string
-	pfx      *prefix.PrefixStore
 	subber   *metadatasubscriber
 	incoming chan *bw2.SimpleMessage
 	// map of alias -> VK namespace
@@ -25,13 +23,12 @@ type viewManager struct {
 	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client, vk string, store MetadataStore, ts TimeseriesStore, pfx *prefix.PrefixStore, subber *metadatasubscriber) *viewManager {
+func newViewManager(client *bw2.BW2Client, vk string, store MetadataStore, ts TimeseriesStore, subber *metadatasubscriber) *viewManager {
 	vm := &viewManager{
 		client:           client,
 		store:            store,
 		ts:               ts,
 		vk:               vk,
-		pfx:              pfx,
 		subber:           subber,
 		incoming:         make(chan *bw2.SimpleMessage, 100),
 		namespaceAliases: make(map[string]string),
