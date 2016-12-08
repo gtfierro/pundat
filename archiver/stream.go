@@ -164,15 +164,3 @@ func (s *Stream) getTime(thing interface{}) time.Time {
 	}
 	return time.Now()
 }
-
-/*
-So how does this work?
-
-The archiver subscribes to all !meta/giles tags, which contain ArchiveRequests.
-The archiver pulls thse requests, parses them and turns them into Streams.
-This involves:
-- getting the list of uris for metadata and associating them with the stream
-- save the state of the stream:
-	- send the list of metadatauris to the subber
-	- save the mapping of stream UUID to those URIs
-*/

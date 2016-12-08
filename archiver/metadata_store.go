@@ -75,7 +75,7 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 				// fetch the updates for this prefix
 				var records bson.M
 				err := m.prefixRecords.Find(bson.M{"__prefix": pfx}).One(&records)
-				if err != nil {
+				if err != nil && err != mgo.ErrNotFound {
 					log.Error(errors.Wrap(err, "Problem fetching prefix updates"))
 					continue
 				}
@@ -88,6 +88,9 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 						update[k] = record["value"].(string)
 					}
 				}
+				if len(update) == 0 {
+					continue // nothing to update
+				}
 
 				var uuidsToUpdate []string
 				err = m.mapping.Find(bson.M{"uri": bson.M{"$regex": "^" + pfx + ""}}).Distinct("uuid", &uuidsToUpdate)
@@ -98,7 +101,7 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 				if len(uuidsToUpdate) == 0 {
 					continue
 				}
-				chunksize := 100
+				chunksize := 500
 				startBlock := 0
 				endBlock := startBlock + chunksize
 				for startBlock < len(uuidsToUpdate) {
@@ -106,13 +109,14 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 						endBlock = len(uuidsToUpdate)
 					}
 					batch := uuidsToUpdate[startBlock:endBlock]
+					startBlock += chunksize
+					endBlock += chunksize
+
 					_, err := m.documents.UpdateAll(bson.M{"uuid": bson.M{"$in": batch}}, bson.M{"$set": update})
 					if err != nil {
 						log.Error(errors.Wrap(err, "Problem updating metadata for prefix"))
 						continue
 					}
-					startBlock += chunksize
-					endBlock += chunksize
 				}
 			}
 			log.Noticef("Updated %d prefixes in %s", len(updatedPrefixes), time.Since(t))
@@ -307,10 +311,17 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 		return nil
 	}
 
-	if err := m.mapping.Insert(bson.M{"uuid": uuid, "uri": uri}); err != nil && !mgo.IsDup(err) {
+	// mark prefixes of new timeseries as 'new' so that we know that we update them
+	m.prefixRecordsLock.Lock()
+	defer m.prefixRecordsLock.Unlock()
+	for _, pfx := range GetURIPrefixes(uri) {
+		m.updatedPrefixes[pfx] = struct{}{}
+	}
+
+	if _, err := m.mapping.Upsert(bson.M{"uuid": uuid}, bson.M{"uuid": uuid, "uri": uri}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert uuid,uri mapping")
 	}
-	if err := m.documents.Insert(bson.M{"uuid": uuid, "_uri": uri}); err != nil && !mgo.IsDup(err) {
+	if _, err := m.documents.Upsert(bson.M{"uuid": uuid}, bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert uuid,uri new document")
 	}
 
