@@ -2,17 +2,19 @@ package archiver
 
 import (
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/gtfierro/pundat/common"
 	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"net"
-	"time"
 )
 
 type groupedrecord struct {
-	UUID    string `bson:"_id"`
+	Prefix  string
 	Records []bson.M
 }
 
@@ -50,82 +52,70 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 	}
 	log.Notice("...connected!")
 	// fetch/create collections and db reference
-	m.db = m.session.DB("pundat")
-	m.metadata = m.db.C(c.collectionPrefix + "metadata")
-	m.records = m.db.C(c.collectionPrefix + "records")
-	m.mapping = m.db.C(c.collectionPrefix + "mapping")
-	m.documents = m.db.C(c.collectionPrefix + "documents")
+	m.db = m.session.DB(c.collectionPrefix + "_pundat")
+	m.metadata = m.db.C("metadata")
+	m.mapping = m.db.C("mapping")
+	m.documents = m.db.C("documents")
+	m.prefixRecords = m.db.C("prefix_records")
 
 	// add indexes. This will fail Fatal
 	m.addIndexes()
 
 	go func() {
 		for _ = range time.Tick(10 * time.Second) {
-			var allUUIDs []string
-			err := m.metadata.Find(bson.M{}).Distinct("uuid", &allUUIDs)
-			if err != nil {
-				log.Error(err)
-				continue
+			var updatedPrefixes []string
+			m.updatedPrefixesLock.Lock()
+			for pfx := range m.updatedPrefixes {
+				updatedPrefixes = append(updatedPrefixes, pfx)
 			}
-			startBlock := 0
-			step := 1000
-			endBlock := startBlock + step
-			for startBlock < len(allUUIDs) {
-				if endBlock > len(allUUIDs) {
-					endBlock = len(allUUIDs)
-				}
-				log.Debug(startBlock, endBlock, len(allUUIDs))
-				batch := allUUIDs[startBlock:endBlock]
-				startBlock += step
-				endBlock += step
-				pipe := m.metadata.Pipe([]bson.M{{"$match": bson.M{"uuid": bson.M{"$in": batch}}}, {"$group": bson.M{"_id": "$uuid", "records": bson.M{"$push": "$$ROOT"}}}})
-				// get iterator
-				iter := pipe.Iter()
-				var group groupedrecord
-				var updates []interface{}
-				for iter.Next(&group) {
-					doc := bson.M{"uuid": group.UUID}
-					for _, rec := range group.Records {
-						if key, found := rec["key"]; !found {
-							continue
-						} else {
-							doc[key.(string)] = rec["value"]
-						}
-					}
-					uri, err := m.URIFromUUID(common.ParseUUID(group.UUID))
-					if err != nil {
-						log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", group.UUID))
-						continue
-					}
-					doc["path"] = uri
-					updates = append(updates, bson.M{"uuid": group.UUID})
-					updates = append(updates, bson.M{"$set": doc})
-				}
-				if err := iter.Close(); err != nil {
-					log.Error(errors.Wrap(err, "Could not close iterator"))
+			m.updatedPrefixes = make(map[string]struct{})
+			m.updatedPrefixesLock.Unlock()
+			t := time.Now()
+			for _, pfx := range updatedPrefixes {
+				// fetch the updates for this prefix
+				var records bson.M
+				err := m.prefixRecords.Find(bson.M{"__prefix": pfx}).One(&records)
+				if err != nil {
+					log.Error(errors.Wrap(err, "Problem fetching prefix updates"))
 					continue
 				}
-				log.Noticef("Updating metadata: %d updates", len(updates))
-				bulk := m.documents.Bulk()
-				bulk.Upsert(updates...)
-				_, err = bulk.Run()
-				if err != nil && !mgo.IsDup(err) {
-					log.Error(errors.Wrap(err, "Could not do bulk operation"))
-					continue
-				} else if err == nil {
-					//log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
+				update := make(bson.M)
+				for k, v := range records {
+					if k == "__prefix" {
+						continue // skip this
+					}
+					if record, ok := v.(bson.M); ok {
+						update[k] = record["value"].(string)
+					}
 				}
 
-				// handle bulk error case from mongo
-				if be, ok := err.(*mgo.BulkError); ok {
-					if len(be.Cases()) == 0 {
+				var uuidsToUpdate []string
+				err = m.mapping.Find(bson.M{"uri": bson.M{"$regex": "^" + pfx + ""}}).Distinct("uuid", &uuidsToUpdate)
+				if err != nil {
+					log.Error(errors.Wrap(err, "Problem fetching matching uris for prefix"))
+					continue
+				}
+				if len(uuidsToUpdate) == 0 {
+					continue
+				}
+				chunksize := 100
+				startBlock := 0
+				endBlock := startBlock + chunksize
+				for startBlock < len(uuidsToUpdate) {
+					if endBlock > len(uuidsToUpdate) {
+						endBlock = len(uuidsToUpdate)
+					}
+					batch := uuidsToUpdate[startBlock:endBlock]
+					_, err := m.documents.UpdateAll(bson.M{"uuid": bson.M{"$in": batch}}, bson.M{"$set": update})
+					if err != nil {
+						log.Error(errors.Wrap(err, "Problem updating metadata for prefix"))
 						continue
 					}
-				}
-				if err != nil {
-					log.Error(err)
+					startBlock += chunksize
+					endBlock += chunksize
 				}
 			}
+			log.Noticef("Updated %d prefixes in %s", len(updatedPrefixes), time.Since(t))
 		}
 	}()
 
@@ -147,12 +137,6 @@ func (m *mongoStore) addIndexes() {
 		log.Fatalf("Could not create index on metadata.{UUID, srcuri, key} (%v)", err)
 	}
 
-	index.Key = []string{"srcuri", "key"}
-	err = m.records.EnsureIndex(index)
-	if err != nil {
-		log.Fatalf("Could not create index on records.{srcuri,key} (%v)", err)
-	}
-
 	index.Key = []string{"uri", "uuid"}
 	err = m.mapping.EnsureIndex(index)
 	if err != nil {
@@ -163,13 +147,11 @@ func (m *mongoStore) addIndexes() {
 	if err != nil {
 		log.Fatalf("Could not create index on documents.{uri,uuid} (%v)", err)
 	}
-	//index.Key = []string{"$text:$**"}
-	//index.Unique = false
-	//index.DropDups = false
-	//err = m.documents.EnsureIndex(index)
-	//if err != nil {
-	//	log.Fatalf("Could not create text index on documents (%v)", err)
-	//}
+	index.Key = []string{"__prefix"}
+	err = m.prefixRecords.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on prefix_records.{__prefix} (%v)", err)
+	}
 }
 
 func (m *mongoStore) GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error) {
@@ -278,86 +260,29 @@ func (m *mongoStore) GetDistinct(VK string, tag string, where common.Dict) ([]st
 	return distincts, nil
 }
 
+// save the records to prefixRecords, where they are grouped by their stripped prefix (which is their URI
+// but without !meta/keyname at the end).
 func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 	if len(records) == 0 {
 		log.Infof("Aborting metadata insert with 0 records")
 		return nil
 	}
-
-	// insert unmapped records
-	inserts := make([]interface{}, len(records))
-	for i, rec := range records {
-		inserts[i] = rec
-	}
-	err := m.records.Insert(inserts...)
-	if err != nil && !mgo.IsDup(err) {
-		return errors.Wrap(err, "Could not insert")
-	}
-
-	var updatedUUIDs []common.UUID
-	// attempt to update records for which a mapping exists
+	m.prefixRecordsLock.Lock()
+	m.updatedPrefixesLock.Lock()
+	defer m.updatedPrefixesLock.Unlock()
+	defer m.prefixRecordsLock.Unlock()
+	// now insert the updated metadata records, grouped by their stripped prefix
 	for _, rec := range records {
-		// need to "duplicate" each record by each of the streams it belongs to
-		stripped := StripBangMeta(rec.SrcURI)
-		uuids, err := m.pfx.GetUUIDsFromURI(stripped)
-		if err != nil {
-			return errors.Wrap(err, "Could not get UUIDs from URI")
-		}
-		updatedUUIDs = append(updatedUUIDs, uuids...)
-		for _, u := range uuids {
-			rec.UUID = u
-			if _, err := m.metadata.Upsert(bson.M{"key": rec.Key, "srcuri": rec.SrcURI, "uuid": rec.UUID}, rec); err != nil && !mgo.IsDup(err) {
-				return errors.Wrap(err, "Could not upsert")
-			}
+		pfx := StripBangMeta(rec.SrcURI)
+		m.updatedPrefixes[pfx] = struct{}{} // mark this prefix as needing updates
+		update := bson.M{"$set": bson.M{rec.Key: rec}}
+		_, err := m.prefixRecords.Upsert(bson.M{"__prefix": pfx}, update)
+		if err != nil && !mgo.IsDup(err) {
+			return errors.Wrapf(err, "Could not insert record %v into prefixRecords", rec)
 		}
 	}
 
-	// now we collect up documents so we can make queries on them
-	// only update metadata if:
-	// - it is in the list of UUIDs we have (use $match?
-	// - there is actually metadata included
-	pipe := m.metadata.Pipe([]bson.M{{"$match": bson.M{"uuid": bson.M{"$in": updatedUUIDs}}}, {"$group": bson.M{"_id": "$uuid", "records": bson.M{"$push": "$$ROOT"}}}})
-	// get iterator
-	iter := pipe.Iter()
-	var group groupedrecord
-	var updates []interface{}
-	for iter.Next(&group) {
-		doc := bson.M{"uuid": group.UUID}
-		for _, rec := range group.Records {
-			if key, found := rec["key"]; !found {
-				continue
-			} else {
-				doc[key.(string)] = rec["value"]
-			}
-		}
-		uri, err := m.URIFromUUID(common.ParseUUID(group.UUID))
-		if err != nil {
-			log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", group.UUID))
-			continue
-		}
-		doc["path"] = uri
-		updates = append(updates, bson.M{"uuid": group.UUID})
-		updates = append(updates, bson.M{"$set": doc})
-	}
-	if err := iter.Close(); err != nil {
-		return errors.Wrap(err, "Could not close iterator")
-	}
-	bulk := m.documents.Bulk()
-	bulk.Upsert(updates...)
-	_, err = bulk.Run()
-	if err != nil && !mgo.IsDup(err) {
-		return errors.Wrap(err, "Could not do bulk operation")
-	} else if err == nil {
-		//log.Infof("Bulk update: %d matched, %d modified", stats.Matched, stats.Modified)
-	}
-
-	// handle bulk error case from mongo
-	if be, ok := err.(*mgo.BulkError); ok {
-		if len(be.Cases()) == 0 {
-			return nil
-		}
-	}
-	return err
+	return nil
 }
 
 func (m *mongoStore) AddNameTag(name string, uuid common.UUID) error {
@@ -381,54 +306,14 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 	if m.uricache.Get(uri+uuid.String()) != nil {
 		return nil
 	}
-	// associate the URI with this UUID
-	if err := m.pfx.AddUUIDURIMapping(uri, uuid); err != nil {
-		return errors.Wrap(err, "Could not save mapping of uri to uuid")
-	}
 
 	if err := m.mapping.Insert(bson.M{"uuid": uuid, "uri": uri}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert uuid,uri mapping")
 	}
-
-	// fetch URI for this UUID
-	uri, err := m.URIFromUUID(uuid)
-	if err != nil {
-		log.Error(errors.Wrapf(err, "Could not fetch URI for uuid %s", uuid))
+	if err := m.documents.Insert(bson.M{"uuid": uuid, "_uri": uri}); err != nil && !mgo.IsDup(err) {
+		return errors.Wrap(err, "Could not insert uuid,uri new document")
 	}
 
-	// make sure we deposit the UUID in the metadata table at the *very* least
-	if err := m.metadata.Insert(bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
-		return errors.Wrap(err, "Could not insert UUID")
-	}
-	if _, err := m.documents.Upsert(bson.M{"uuid": uuid}, bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
-		return errors.Wrap(err, "Could not insert UUID")
-	}
-
-	// find existing metadata tags for each of the "prefixes" of the main URI
-	mappedURIs, err := m.pfx.GetMetadataSuperstrings(uri)
-	if err != nil {
-		return err
-	}
-	// for these metadata URIs, copy their metadata into the MD database for this UUID
-	var records []bson.M
-	if err := m.records.Find(bson.M{"srcuri": bson.M{"$in": mappedURIs}}).All(&records); err != nil {
-		return errors.Wrap(err, "Could not fetch records")
-	}
-	if len(records) > 0 {
-		for _, rec := range records {
-			rec["uuid"] = uuid
-			upsert := bson.M{
-				"key":    rec["key"],
-				"srcuri": rec["srcuri"],
-				"uuid":   rec["uuid"],
-			}
-			delete(rec, "_id")
-			if _, err := m.metadata.Upsert(upsert, rec); err != nil && !mgo.IsDup(err) {
-				log.Error(err)
-				return err
-			}
-		}
-	}
 	m.uricache.Set(uri+uuid.String(), struct{}{}, 10*time.Minute)
 
 	return nil

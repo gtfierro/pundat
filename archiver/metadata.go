@@ -16,18 +16,16 @@ type subscription struct {
 	// subscription
 	sub chan *bw2.SimpleMessage
 	// last value of this metadata subscription
-	lastValue *common.MetadataRecord
-	cancel    chan bool
+	cancel chan bool
 	sync.Mutex
 }
 
 func newSubscription(uri string, sub chan *bw2.SimpleMessage) *subscription {
 	s := &subscription{
-		uri:       uri,
-		refs:      1,
-		lastValue: nil,
-		sub:       sub,
-		cancel:    make(chan bool, 1),
+		uri:    uri,
+		refs:   1,
+		sub:    sub,
+		cancel: make(chan bool, 1),
 	}
 	return s
 }
