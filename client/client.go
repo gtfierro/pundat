@@ -2,11 +2,14 @@ package client
 
 import (
 	"fmt"
-	messages "github.com/gtfierro/pundat/archiver"
-	bw "gopkg.in/immesys/bw2bind.v5"
+	"log"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
+
+	messages "github.com/gtfierro/pundat/archiver"
+	bw "gopkg.in/immesys/bw2bind.v5"
 )
 
 const GilesQueryChangedRangesPIDString = "2.0.8.8"
@@ -18,27 +21,65 @@ func init() {
 }
 
 type PundatClient struct {
-	client *bw.BW2Client
-	vk     string
-	uri    string
+	client  *bw.BW2Client
+	vk      string
+	uri     string
+	c       chan *bw.SimpleMessage
+	waiting map[uint32]chan *bw.SimpleMessage
+	sync.RWMutex
 }
 
 // Create a new API isntance w/ the given client and VerifyingKey.
 // The verifying key is returned by any of the BW2Client.SetEntity* calls
 // URI should be the base of the giles service
-func NewPundatClient(client *bw.BW2Client, vk string, uri string) *PundatClient {
-	return &PundatClient{
-		client: client,
-		vk:     vk,
-		uri:    strings.TrimSuffix(uri, "/") + "/s.giles/_/i.archiver",
+func NewPundatClient(client *bw.BW2Client, vk string, uri string) (*PundatClient, error) {
+	pc := &PundatClient{
+		client:  client,
+		vk:      vk,
+		uri:     strings.TrimSuffix(uri, "/") + "/s.giles/_/i.archiver",
+		waiting: make(map[uint32]chan *bw.SimpleMessage),
 	}
+	c, err := pc.client.Subscribe(&bw.SubscribeParams{
+		URI: pc.uri + fmt.Sprintf("/signal/%s,queries", pc.vk[:len(pc.vk)-1]),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Could not subscribe (%v)", err)
+	}
+	pc.c = c
+
+	go func() {
+		// subscribe and decode messages to get nonces
+		for msg := range pc.c {
+			nonce, err := getNonce(msg)
+			if err != nil {
+				log.Println(fmt.Sprintf("Error fetching nonce (%v)", err))
+				continue
+			}
+			pc.Lock()
+			if replyChan, found := pc.waiting[nonce]; found {
+				// throw it in if channel is listening, else drop it
+				select {
+				case replyChan <- msg:
+					delete(pc.waiting, nonce)
+				default:
+				}
+			}
+			pc.Unlock()
+		}
+	}()
+
+	return pc, nil
+}
+
+func (pc *PundatClient) markWaitFor(nonce uint32, replyChan chan *bw.SimpleMessage) {
+	pc.Lock()
+	pc.waiting[nonce] = replyChan
+	pc.Unlock()
 }
 
 // synchronously queries
 func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult, tsRes messages.QueryTimeseriesResult, chRes messages.QueryChangedResult, err error) {
 	var (
-		c        chan *bw.SimpleMessage
-		tag      string
 		tsfound  bool
 		mdfound  bool
 		chfound  bool
@@ -49,21 +90,19 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 		Query: query,
 		Nonce: nonce,
 	}
-	c, tag, err = pc.client.SubscribeH(&bw.SubscribeParams{
-		URI: pc.uri + fmt.Sprintf("/signal/%s,queries", pc.vk[:len(pc.vk)-1]),
-	})
-	if err != nil {
-		err = err
-		return
-	}
+
+	replyChan := make(chan *bw.SimpleMessage, 1)
+	pc.markWaitFor(nonce, replyChan)
+
 	err = pc.client.Publish(&bw.PublishParams{
 		URI:            pc.uri + "/slot/query",
 		PayloadObjects: []bw.PayloadObject{msg.ToMsgPackBW()},
 	})
 	if err != nil {
+		err = fmt.Errorf("Could not publish (%v)", err)
 		return
 	}
-	for msg := range c {
+	for msg := range replyChan {
 		errfound, err = getError(nonce, msg)
 		if errfound {
 			return
@@ -81,7 +120,6 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 			return
 		}
 		if tsfound || mdfound || chfound {
-			err = pc.client.Unsubscribe(tag)
 			if err != nil {
 				return
 			}
@@ -161,4 +199,31 @@ func getChanged(nonce uint32, msg *bw.SimpleMessage) (bool, messages.QueryChange
 		return true, changedResults, nil
 	}
 	return false, changedResults, nil
+}
+
+func getNonce(msg *bw.SimpleMessage) (uint32, error) {
+	var (
+		po                bw.PayloadObject
+		changedResults    messages.QueryChangedResult
+		timeseriesResults messages.QueryTimeseriesResult
+		metadataResults   messages.QueryMetadataResult
+		queryError        messages.QueryError
+	)
+	if po = msg.GetOnePODF(bw.PODFGilesQueryError); po != nil {
+		err := po.(bw.MsgPackPayloadObject).ValueInto(&queryError)
+		return queryError.Nonce, err
+	}
+	if po = msg.GetOnePODF(bw.PODFGilesMetadataResponse); po != nil {
+		err := po.(bw.MsgPackPayloadObject).ValueInto(&metadataResults)
+		return metadataResults.Nonce, err
+	}
+	if po = msg.GetOnePODF(bw.PODFGilesTimeseriesResponse); po != nil {
+		err := po.(bw.MsgPackPayloadObject).ValueInto(&timeseriesResults)
+		return timeseriesResults.Nonce, err
+	}
+	if po = msg.GetOnePODF(GilesQueryChangedRangesPIDString); po != nil {
+		err := po.(bw.MsgPackPayloadObject).ValueInto(&changedResults)
+		return changedResults.Nonce, err
+	}
+	return 0, fmt.Errorf("no nonce found?!")
 }
