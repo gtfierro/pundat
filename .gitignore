@@ -1,0 +1,9 @@
+# bosswave stuff
+*.dot
+*.rvk
+
+# binary
+pundat
+
+# logs
+*.log
