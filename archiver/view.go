@@ -92,8 +92,12 @@ func newViewManager(client *bw2.BW2Client, vk string, store MetadataStore, ts Ti
 // on the URI, we extract the list of ArchiveRequests
 func (vm *viewManager) subscribeNamespace(ns string) {
 	namespace := strings.TrimSuffix(ns, "/") + "/*/!meta/giles"
+	log.Noticef("Intend to subscribe to %s", namespace)
 
-	c2, _ := bw2util.NewClient(vm.client, vm.vk)
+	c2, err := bw2util.NewClient(vm.client, vm.vk)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "Problem in creating new client"))
+	}
 	inp, err := c2.MultiSubscribe(ns + "/*/!meta/giles")
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "Problem in multi subscribe"))
