@@ -143,6 +143,7 @@ func (a *Archiver) listenQueries(msg *bw2.SimpleMessage) {
 		if err := a.iface.PublishSignal(signalURI, po); err != nil {
 			log.Error(errors.Wrap(err, "Error sending response"))
 		}
+		return
 	}
 
 	// assemble replies

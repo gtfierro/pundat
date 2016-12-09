@@ -33,6 +33,10 @@ func (msg QueryError) ToMsgPackBW() (po bw2.PayloadObject) {
 	return
 }
 
+func (msg QueryError) IsEmpty() bool {
+	return msg.Error == ""
+}
+
 type QueryMetadataResult struct {
 	Nonce uint32
 	Data  []KeyValueMetadata
@@ -49,6 +53,10 @@ func (msg QueryMetadataResult) Dump() string {
 		res += kv.Dump()
 	}
 	return res
+}
+
+func (msg QueryMetadataResult) IsEmpty() bool {
+	return len(msg.Data) == 0
 }
 
 type QueryTimeseriesResult struct {
@@ -73,6 +81,10 @@ func (msg QueryTimeseriesResult) Dump() string {
 	return res
 }
 
+func (msg QueryTimeseriesResult) IsEmpty() bool {
+	return len(msg.Data) == 0 && len(msg.Stats) == 0
+}
+
 type QueryChangedResult struct {
 	Nonce   uint32
 	Changed []ChangedRange
@@ -89,6 +101,10 @@ func (msg QueryChangedResult) Dump() string {
 		res += cr.Dump()
 	}
 	return res
+}
+
+func (msg QueryChangedResult) IsEmpty() bool {
+	return len(msg.Changed) == 0
 }
 
 type KeyValueMetadata struct {
