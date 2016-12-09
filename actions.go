@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/codegangsta/cli"
-	"github.com/gtfierro/bwquery/api"
 	"github.com/gtfierro/pundat/archiver"
+	"github.com/gtfierro/pundat/client"
 	"github.com/mgutz/ansi"
 	"github.com/pkg/errors"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
@@ -118,18 +118,21 @@ func makeConfig(c *cli.Context) error {
 }
 
 func doIQuery(c *cli.Context) error {
-	client := bw2.ConnectOrExit("")
-	vk := client.SetEntityFileOrExit(c.String("entity"))
-	client.OverrideAutoChainTo(true)
+	bwclient := bw2.ConnectOrExit("")
+	vk := bwclient.SetEntityFileOrExit(c.String("entity"))
+	bwclient.OverrideAutoChainTo(true)
 
 	if c.NArg() == 0 {
 		return errors.New("Need to specify a namespace or URI prefix of an archiver (can use 'pundat scan' to help)")
 	}
 	archiverURI := c.Args().Get(0)
 
-	API := api.NewAPI(client, vk, archiverURI)
+	pc, err := client.NewPundatClient(bwclient, vk, archiverURI)
+	if err != nil {
+		return err
+	}
 
-	res, err := client.Query(&bw2.QueryParams{
+	res, err := bwclient.Query(&bw2.QueryParams{
 		URI: archiverURI + "/s.giles/!meta/lastalive",
 	})
 	if err != nil {
@@ -172,9 +175,9 @@ func doIQuery(c *cli.Context) error {
 	)
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:       "(bwquery)>",
+		Prompt:       "(pundat)>",
 		AutoComplete: completer,
-		HistoryFile:  currentUser.HomeDir + "/.bwquery",
+		HistoryFile:  currentUser.HomeDir + "/.pundat_query_history",
 	})
 	if err != nil {
 		return err
@@ -187,10 +190,19 @@ func doIQuery(c *cli.Context) error {
 			fmt.Println(err)
 			break
 		}
-		err = API.Query(line)
+		md, ts, ch, err := pc.Query(line)
 		if err != nil {
 			fmt.Println(err)
-			break
+			continue
+		}
+		if !md.IsEmpty() {
+			fmt.Println(md.Dump())
+		}
+		if !ts.IsEmpty() {
+			fmt.Println(ts.Dump())
+		}
+		if !ch.IsEmpty() {
+			fmt.Println(ch.Dump())
 		}
 	}
 	return nil
