@@ -74,7 +74,7 @@ func main() {
 		},
 		{
 			Name:   "gettime",
-			Usage:  "Convert a time expression into a Unix nano timestamp",
+			Usage:  "Convert a time expression into a Unix nano timestamp. No arguments => returns current time",
 			Action: doTime,
 		},
 	}
