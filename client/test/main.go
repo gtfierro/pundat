@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+
 	"github.com/gtfierro/pundat/client"
 	bw "gopkg.in/immesys/bw2bind.v5"
-	"os"
 )
 
 func main() {
@@ -12,11 +14,14 @@ func main() {
 	bwclient.OverrideAutoChainTo(true)
 	vk := bwclient.SetEntityFromEnvironOrExit()
 
-	pc := client.NewPundatClient(bwclient, vk, "ucberkeley")
-	ts, md, ch, err := pc.Query(os.Args[1])
+	pc, err := client.NewPundatClient(bwclient, vk, "ucberkeley")
+	if err != nil {
+		log.Fatal(err)
+	}
+	md, ts, ch, err := pc.Query(os.Args[1])
 
-	fmt.Println("ts", ts)
 	fmt.Println("md", md)
+	fmt.Println("ts", ts)
 	fmt.Println("ch", ch)
 	fmt.Println("err", err)
 }
