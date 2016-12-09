@@ -72,6 +72,11 @@ func main() {
 				},
 			},
 		},
+		{
+			Name:   "gettime",
+			Usage:  "Convert a time expression into a Unix nano timestamp",
+			Action: doTime,
+		},
 	}
 	app.Run(os.Args)
 }

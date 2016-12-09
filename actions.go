@@ -11,6 +11,7 @@ import (
 	"gopkg.in/readline.v1"
 	"os"
 	"os/user"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -235,6 +236,51 @@ func doScan(c *cli.Context) error {
 			fmt.Println(newColor(fmt.Sprintf("     URI        -> %s", uri)))
 			fmt.Println(newColor(fmt.Sprintf("     Last Alive -> %v (%v ago)", alive, ago)))
 			fmt.Println()
+		}
+	}
+	return nil
+}
+
+func doTime(c *cli.Context) error {
+	var supported_formats = []string{"1/2/2006",
+		"1-2-2006",
+		"1/2/2006 03:04:05 PM MST",
+		"1-2-2006 03:04:05 PM MST",
+
+		"1/2/2006 15:04:05 MST",
+		"1-2-2006 15:04:05 MST",
+		"2006-1-2 15:04:05 MST",
+
+		"1/2/2006 03:04:05 PM",
+		"1-2-2006 03:04:05 PM",
+		"2006-1-2 03:04:05 PM",
+
+		"1/2/2006 15:04:05",
+		"1-2-2006 15:04:05",
+		"2006-1-2 15:04:05",
+
+		"1/2/2006 15:04",
+		"1-2-2006 15:04",
+		"2006-1-2 15:04",
+	}
+	if c.NArg() == 0 {
+		// use current time
+		fmt.Println(time.Now().UnixNano())
+		return nil
+	}
+	re := regexp.MustCompile("^([-+]?)([0-9]*)([a-zA-Z]*)$")
+	for i := 0; i < c.NArg(); i++ {
+		s := c.Args().Get(i)
+		results := re.FindAllStringSubmatch(s, -1)
+		if len(results) == 0 {
+			for _, format := range supported_formats {
+				t, err := time.Parse(format, s)
+				if err != nil {
+					continue
+				}
+				fmt.Println(t.UnixNano())
+				break
+			}
 		}
 	}
 	return nil
