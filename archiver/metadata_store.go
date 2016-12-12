@@ -208,9 +208,15 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 		results     []common.MetadataGroup
 	)
 
-	selectTags := bson.M{"_id": 0, "path": 1, "uuid": 1}
+	// if we have tags, then we make sure to include path/uuid. Otherwise, we need to keep
+	// selectTags using just exclusive (e.g. _id: 0) so that mongo knows to return all of the document
+	selectTags := bson.M{"_id": 0}
 	for _, tag := range tags {
 		selectTags[tag] = 1
+	}
+	if len(tags) > 0 {
+		selectTags["path"] = 1
+		selectTags["uuid"] = 1
 	}
 
 	if len(where) != 0 {
