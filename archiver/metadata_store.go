@@ -208,7 +208,7 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 		results     []common.MetadataGroup
 	)
 
-	selectTags := bson.M{"_id": 0}
+	selectTags := bson.M{"_id": 0, "path": 1, "uuid": 1}
 	for _, tag := range tags {
 		selectTags[tag] = 1
 	}
