@@ -129,10 +129,11 @@ func (msg KeyValueMetadata) Dump() string {
 			md[k] = v
 		}
 	}
-	msg.Metadata = md
-	if bytes, err := json.MarshalIndent(msg, "", "  "); err != nil {
+	md["uuid"] = msg.UUID
+	md["path"] = msg.Path
+	if bytes, err := json.MarshalIndent(md, "", "  "); err != nil {
 		log.Error(err)
-		return fmt.Sprintf("%+v", msg)
+		return fmt.Sprintf("%+v", md)
 	} else {
 		return string(bytes)
 	}
