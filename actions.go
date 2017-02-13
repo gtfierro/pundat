@@ -354,6 +354,7 @@ func doGrant(c *cli.Context) error {
 
 	var dotsToPublish [][]byte
 	var hashToPublish []string
+	var urisToPublish []string
 	successcolor := ansi.ColorFunc("green")
 
 	// scan URI
@@ -376,6 +377,7 @@ func doGrant(c *cli.Context) error {
 		log.Info("Granting DOT", hash)
 		dotsToPublish = append(dotsToPublish, blob)
 		hashToPublish = append(hashToPublish, hash)
+		urisToPublish = append(urisToPublish, scanURI)
 	}
 
 	// query URI
@@ -398,6 +400,7 @@ func doGrant(c *cli.Context) error {
 		log.Info("Granting DOT", hash)
 		dotsToPublish = append(dotsToPublish, blob)
 		hashToPublish = append(hashToPublish, hash)
+		urisToPublish = append(urisToPublish, queryURI)
 	}
 
 	// response URI
@@ -420,22 +423,27 @@ func doGrant(c *cli.Context) error {
 		log.Info("Granting DOT", hash)
 		dotsToPublish = append(dotsToPublish, blob)
 		hashToPublish = append(hashToPublish, hash)
+		urisToPublish = append(urisToPublish, responseURI)
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(len(dotsToPublish))
 	quit := make(chan bool)
+	var once sync.Once
+
 	for idx, blob := range dotsToPublish {
 		blob := blob
 		hash := hashToPublish[idx]
+		uri := urisToPublish[idx]
 		go func(blob []byte, hash string) {
 			log.Info("Publishing DOT", hash)
 			defer wg.Done()
 			a, err := datmoney.PublishDOT(blob)
+			once.Do(func() { quit <- true }) // quit the progress bar
 			if err != nil {
 				log.Error(errors.Wrap(err, fmt.Sprintf("Could not publish DOT with hash %s (%s)", hash, uri)))
 			} else {
-				log.Info(successcolor(fmt.Sprintf("Successfully published DOT %s", a)))
+				log.Info(successcolor(fmt.Sprintf("Successfully published DOT %s (%s)", a, uri)))
 			}
 		}(blob, hash)
 	}
@@ -452,7 +460,6 @@ func doGrant(c *cli.Context) error {
 		}
 	}()
 	wg.Wait()
-	quit <- true
 
 	return nil
 }
