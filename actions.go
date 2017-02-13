@@ -13,6 +13,7 @@ import (
 
 	"github.com/gtfierro/pundat/archiver"
 	"github.com/gtfierro/pundat/client"
+	"github.com/gtfierro/pundat/dots"
 
 	"github.com/immesys/bw2/objects"
 	"github.com/immesys/bw2/util"
@@ -552,6 +553,35 @@ func checkAccess(bwclient *bw2.BW2Client, key, uri string) (uris []string, hasPe
 	fmt.Println(successcolor(fmt.Sprintf("Key %s has access to archiver at %s\n", key_vk, uri)))
 
 	return
+}
+
+func doRange(c *cli.Context) error {
+	bw2.SilenceLog()
+	client := bw2.ConnectOrExit(c.String("agent"))
+	client.SetEntityFileOrExit(c.String("entity"))
+	client.OverrideAutoChainTo(true)
+	master := dots.NewDotMaster(client, 10)
+
+	uri := c.String("uri")
+	if uri == "" {
+		log.Fatal("Need to provide uri")
+	}
+	key := c.String("key")
+
+	key_vk, err := resolveKey(client, key)
+	if err != nil {
+		log.Fatal(errors.Wrapf(err, "Could not resolve key %s", key))
+	}
+
+	rangeset, err := master.GetValidRanges(c.String("uri"), key_vk)
+	if err != nil {
+		log.Fatal(errors.Wrapf(err, "Could not check ranges for uri %s against key %s", uri, key_vk))
+	}
+	fmt.Printf("Key %s has %d valid archival ranges on uri %s:\n", key_vk, len(rangeset.Ranges), uri)
+	for _, r := range rangeset.Ranges {
+		fmt.Println("  ", r.String())
+	}
+	return nil
 }
 
 func doTime(c *cli.Context) error {

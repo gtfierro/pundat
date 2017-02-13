@@ -153,6 +153,34 @@ func main() {
 			},
 		},
 		{
+			Name:   "range",
+			Usage:  "Check valid ranges of access to a URI of data on behalf of some key",
+			Action: doRange,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
+					Name:   "entity,e",
+					Value:  "",
+					Usage:  "The entity to use",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+				cli.StringFlag{
+					Name:   "key, k",
+					Usage:  "The key or alias to check",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+				cli.StringFlag{
+					Name:  "uri, u",
+					Usage: "The URI we want to check ranges to",
+				},
+			},
+		},
+		{
 			Name:   "gettime",
 			Usage:  "Convert a time expression into a Unix nano timestamp. No arguments => returns current time",
 			Action: doTime,
