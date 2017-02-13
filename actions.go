@@ -14,12 +14,12 @@ import (
 	"github.com/gtfierro/pundat/archiver"
 	"github.com/gtfierro/pundat/client"
 
-	"github.com/codegangsta/cli"
 	"github.com/immesys/bw2/objects"
 	"github.com/immesys/bw2/util"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/mgutz/ansi"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 	"gopkg.in/readline.v1"
 )
 
@@ -265,7 +265,7 @@ func doScan(c *cli.Context) error {
 
 	archivers, times, err := scan(c.Args().Get(0), c.String("entity"), c.String("agent"))
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
 	for i := 0; i < len(archivers); i++ {
@@ -293,11 +293,11 @@ func doCheck(c *cli.Context) error {
 	bw2.SilenceLog()
 	key := c.String("key")
 	if key == "" {
-		return errors.New("Need to specify key")
+		log.Fatal(errors.New("Need to specify key"))
 	}
 	uri := c.String("uri")
 	if uri == "" {
-		return errors.New("Need to specify uri")
+		log.Fatal(errors.New("Need to specify uri"))
 	}
 	entity := c.String("entity")
 	agent := c.String("agent")
@@ -306,28 +306,32 @@ func doCheck(c *cli.Context) error {
 	bwclient.SetEntityFileOrExit(entity)
 	bwclient.OverrideAutoChainTo(true)
 	_, _, err := checkAccess(bwclient, key, uri)
-	return err
+	if err != nil {
+		log.Error("Likely that key does not have access to archiver")
+		log.Fatal(err)
+	}
+	return nil
 }
 
 func doGrant(c *cli.Context) error {
 	bw2.SilenceLog()
 	key := c.String("key")
 	if key == "" {
-		return errors.New("Need to specify key")
+		log.Fatal(errors.New("Need to specify key"))
 	}
 	uri := c.String("uri")
 	if uri == "" {
-		return errors.New("Need to specify uri")
+		log.Fatal(errors.New("Need to specify uri"))
 	}
 	entity := c.String("entity")
 	bankroll := c.String("bankroll")
 	agent := c.String("agent")
 	if c.String("expiry") == "" {
-		return errors.New("Need to specify expiry")
+		log.Fatal(errors.New("Need to specify expiry"))
 	}
 	expiry, err := util.ParseDuration(c.String("expiry"))
 	if err != nil {
-		return errors.Wrap(err, "Could not parse expiry")
+		log.Fatal(errors.Wrap(err, "Could not parse expiry"))
 	}
 	// connect
 	bwclient := bw2.ConnectOrExit(agent)
@@ -341,7 +345,7 @@ func doGrant(c *cli.Context) error {
 
 	key_vk, err := resolveKey(bwclient, key)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
 	datmoney := bw2.ConnectOrExit(agent)
@@ -367,7 +371,7 @@ func doGrant(c *cli.Context) error {
 		}
 		hash, blob, err := bwclient.CreateDOT(params)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions C*", key_vk, scanURI))
+			log.Fatal(errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions C*", key_vk, scanURI)))
 		}
 		log.Info("Granting DOT", hash)
 		dotsToPublish = append(dotsToPublish, blob)
@@ -389,7 +393,7 @@ func doGrant(c *cli.Context) error {
 		}
 		hash, blob, err := bwclient.CreateDOT(params)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions P", key_vk, queryURI))
+			log.Fatal(errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions P", key_vk, queryURI)))
 		}
 		log.Info("Granting DOT", hash)
 		dotsToPublish = append(dotsToPublish, blob)
@@ -411,18 +415,15 @@ func doGrant(c *cli.Context) error {
 		}
 		hash, blob, err := bwclient.CreateDOT(params)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions C", key_vk, responseURI))
+			log.Fatal(errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions C", key_vk, responseURI)))
 		}
 		log.Info("Granting DOT", hash)
 		dotsToPublish = append(dotsToPublish, blob)
 		hashToPublish = append(hashToPublish, hash)
 	}
 
-	// TODO: EXPIRY EXPIRY EXPIRY gotta add it yo
-
 	var wg sync.WaitGroup
 	wg.Add(len(dotsToPublish))
-
 	quit := make(chan bool)
 	for idx, blob := range dotsToPublish {
 		blob := blob
@@ -432,7 +433,7 @@ func doGrant(c *cli.Context) error {
 			defer wg.Done()
 			a, err := datmoney.PublishDOT(blob)
 			if err != nil {
-				log.Error(errors.Wrap(err, fmt.Sprintf("Could not publish DOT with hash %s", hash)))
+				log.Error(errors.Wrap(err, fmt.Sprintf("Could not publish DOT with hash %s (%s)", hash, uri)))
 			} else {
 				log.Info(successcolor(fmt.Sprintf("Successfully published DOT %s", a)))
 			}

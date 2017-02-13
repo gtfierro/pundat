@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/codegangsta/cli"
 	"github.com/op/go-logging"
+	"github.com/urfave/cli"
 	"os"
 )
 
