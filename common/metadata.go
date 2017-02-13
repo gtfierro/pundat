@@ -9,7 +9,7 @@ import (
 
 var timeFormat = "2006-1-2 15:04:05.000000000 -0700 MST"
 
-// not associated with a UUID (durandal-specific). Needs
+// not associated with a UUID (pundat-specific). Needs
 // to be included in a MetadataGroup to make that association.
 type MetadataRecord struct {
 	Key       string

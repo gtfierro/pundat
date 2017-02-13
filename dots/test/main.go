@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/gtfierro/durandal/dots"
+	"github.com/gtfierro/pundat/dots"
 	bw2 "gopkg.in/immesys/bw2bind.v5"
 	"log"
 	"os"
