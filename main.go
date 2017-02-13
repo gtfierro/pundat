@@ -21,7 +21,7 @@ func init() {
 func main() {
 	app := cli.NewApp()
 	app.Name = "pundat"
-	app.Version = "aleph.1"
+	app.Version = "0.1"
 
 	app.Commands = []cli.Command{
 		{
@@ -52,6 +52,12 @@ func main() {
 			Action: doIQuery,
 			Flags: []cli.Flag{
 				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
 					Name:   "entity,e",
 					Value:  "",
 					Usage:  "The entity to use",
@@ -65,10 +71,80 @@ func main() {
 			Action: doScan,
 			Flags: []cli.Flag{
 				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
 					Name:   "entity,e",
 					Value:  "",
 					Usage:  "The entity to use",
 					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+			},
+		},
+		{
+			Name:   "check",
+			Usage:  "Check access to an archiver on behalf of some key",
+			Action: doCheck,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
+					Name:   "entity,e",
+					Value:  "",
+					Usage:  "The entity to use",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+				cli.StringFlag{
+					Name:  "key, k",
+					Usage: "The key or alias to check",
+				},
+				cli.StringFlag{
+					Name:  "uri, u",
+					Usage: "The base URI of the archiver",
+				},
+			},
+		},
+		{
+			Name:   "grant",
+			Usage:  "Grant access to an archiver to some key",
+			Action: doGrant,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
+					Name:   "entity,e",
+					Value:  "",
+					Usage:  "The entity to use",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+				cli.StringFlag{
+					Name:   "bankroll, b",
+					Value:  "",
+					Usage:  "The entity to use for bankrolling",
+					EnvVar: "BW2_DEFAULT_BANKROLL",
+				},
+				cli.StringFlag{
+					Name:  "expiry",
+					Usage: "Set the expiry on access to archiver measured from now e.g. 3d7h20m",
+				},
+				cli.StringFlag{
+					Name:  "key, k",
+					Usage: "The key or alias to check",
+				},
+				cli.StringFlag{
+					Name:  "uri, u",
+					Usage: "The base URI of the archiver",
 				},
 			},
 		},

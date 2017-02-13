@@ -2,20 +2,63 @@ package main
 
 import (
 	"fmt"
-	"github.com/codegangsta/cli"
-	"github.com/gtfierro/pundat/archiver"
-	"github.com/gtfierro/pundat/client"
-	"github.com/mgutz/ansi"
-	"github.com/pkg/errors"
-	bw2 "gopkg.in/immesys/bw2bind.v5"
-	"gopkg.in/readline.v1"
+	"io/ioutil"
 	"os"
 	"os/user"
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/gtfierro/pundat/archiver"
+	"github.com/gtfierro/pundat/client"
+
+	"github.com/codegangsta/cli"
+	"github.com/immesys/bw2/objects"
+	"github.com/immesys/bw2/util"
+	bw2 "github.com/immesys/bw2bind"
+	"github.com/mgutz/ansi"
+	"github.com/pkg/errors"
+	"gopkg.in/readline.v1"
 )
+
+func resolveKey(client *bw2.BW2Client, key string) (string, error) {
+	if _, err := os.Stat(key); err != nil && err != os.ErrNotExist {
+		return "", errors.Wrap(err, "Could not check key file")
+	} else if err == nil {
+		// have a file and load it!
+		contents, err := ioutil.ReadFile(key)
+		if err != nil {
+			return "", errors.Wrap(err, "Could not read file")
+		}
+		entity, err := objects.NewEntity(int(contents[0]), contents[1:])
+		if err != nil {
+			return "", errors.Wrap(err, "Could not decode entity from file")
+		}
+		ent, ok := entity.(*objects.Entity)
+		if !ok {
+			return "", errors.New(fmt.Sprintf("File was not an entity:", key))
+		}
+		key_vk := objects.FmtKey(ent.GetVK())
+		return key_vk, nil
+	} else {
+		// resolve key from registry
+		a, b, err := client.ResolveRegistry(key)
+		if err != nil {
+			return "", errors.Wrapf(err, "Could not resolve key %s", key)
+		}
+		if b != bw2.StateValid {
+			return "", errors.New(fmt.Sprintf("Key was not valid:", key))
+		}
+		ent, ok := a.(*objects.Entity)
+		if !ok {
+			return "", errors.New(fmt.Sprintf("Key was not an entity:", key))
+		}
+		key_vk := objects.FmtKey(ent.GetVK())
+		return key_vk, nil
+	}
+}
 
 func getArchiverAlive(msg *bw2.SimpleMessage) (string, time.Time, error) {
 	var (
@@ -38,13 +81,9 @@ func getArchiverAlive(msg *bw2.SimpleMessage) (string, time.Time, error) {
 	return uri, lastalive, err
 }
 
-func scan(uri, entity string) ([]string, []time.Time, error) {
+func scanWithClient(client *bw2.BW2Client, uri string) ([]string, []time.Time, error) {
 	var found []string
 	var times []time.Time
-
-	client := bw2.ConnectOrExit("")
-	client.SetEntityFileOrExit(entity)
-	client.OverrideAutoChainTo(true)
 
 	uri = strings.TrimRight(uri, "/*+")
 	stuff := strings.Split(uri, "/")
@@ -72,6 +111,14 @@ func scan(uri, entity string) ([]string, []time.Time, error) {
 		times = append(times, alive)
 	}
 	return found, times, nil
+}
+
+func scan(uri, entity, agent string) ([]string, []time.Time, error) {
+	client := bw2.ConnectOrExit(agent)
+	client.SetEntityFileOrExit(entity)
+	client.OverrideAutoChainTo(true)
+
+	return scanWithClient(client, uri)
 }
 
 func startArchiver(c *cli.Context) error {
@@ -119,7 +166,8 @@ func makeConfig(c *cli.Context) error {
 }
 
 func doIQuery(c *cli.Context) error {
-	bwclient := bw2.ConnectOrExit("")
+	bw2.SilenceLog()
+	bwclient := bw2.ConnectOrExit(c.String("agent"))
 	vk := bwclient.SetEntityFileOrExit(c.String("entity"))
 	bwclient.OverrideAutoChainTo(true)
 
@@ -210,12 +258,12 @@ func doIQuery(c *cli.Context) error {
 }
 
 func doScan(c *cli.Context) error {
-
+	bw2.SilenceLog()
 	if c.NArg() == 0 {
 		return errors.New("Need to specify a namespace or URI prefix to scan")
 	}
 
-	archivers, times, err := scan(c.Args().Get(0), c.String("entity"))
+	archivers, times, err := scan(c.Args().Get(0), c.String("entity"), c.String("agent"))
 	if err != nil {
 		return err
 	}
@@ -239,6 +287,258 @@ func doScan(c *cli.Context) error {
 		}
 	}
 	return nil
+}
+
+func doCheck(c *cli.Context) error {
+	bw2.SilenceLog()
+	key := c.String("key")
+	if key == "" {
+		return errors.New("Need to specify key")
+	}
+	uri := c.String("uri")
+	if uri == "" {
+		return errors.New("Need to specify uri")
+	}
+	entity := c.String("entity")
+	agent := c.String("agent")
+	// connect
+	bwclient := bw2.ConnectOrExit(agent)
+	bwclient.SetEntityFileOrExit(entity)
+	bwclient.OverrideAutoChainTo(true)
+	_, _, err := checkAccess(bwclient, key, uri)
+	return err
+}
+
+func doGrant(c *cli.Context) error {
+	bw2.SilenceLog()
+	key := c.String("key")
+	if key == "" {
+		return errors.New("Need to specify key")
+	}
+	uri := c.String("uri")
+	if uri == "" {
+		return errors.New("Need to specify uri")
+	}
+	entity := c.String("entity")
+	bankroll := c.String("bankroll")
+	agent := c.String("agent")
+	if c.String("expiry") == "" {
+		return errors.New("Need to specify expiry")
+	}
+	expiry, err := util.ParseDuration(c.String("expiry"))
+	if err != nil {
+		return errors.Wrap(err, "Could not parse expiry")
+	}
+	// connect
+	bwclient := bw2.ConnectOrExit(agent)
+	bwclient.SetEntityFileOrExit(entity)
+	bwclient.OverrideAutoChainTo(true)
+
+	uris, access, err := checkAccess(bwclient, key, uri)
+	if err != nil {
+		log.Error(err, "(This is probably OK)")
+	}
+
+	key_vk, err := resolveKey(bwclient, key)
+	if err != nil {
+		return err
+	}
+
+	datmoney := bw2.ConnectOrExit(agent)
+	datmoney.SetEntityFileOrExit(bankroll)
+	datmoney.OverrideAutoChainTo(true)
+
+	var dotsToPublish [][]byte
+	var hashToPublish []string
+	successcolor := ansi.ColorFunc("green")
+
+	// scan URI
+	scanAccess := access[0]
+	if !scanAccess {
+		// grant dot
+		scanURI := uris[0]
+		params := &bw2.CreateDOTParams{
+			To:                key_vk,
+			TTL:               0,
+			Comment:           fmt.Sprintf("Access to archiver on URI %s", uri),
+			URI:               scanURI,
+			ExpiryDelta:       expiry,
+			AccessPermissions: "C*",
+		}
+		hash, blob, err := bwclient.CreateDOT(params)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions C*", key_vk, scanURI))
+		}
+		log.Info("Granting DOT", hash)
+		dotsToPublish = append(dotsToPublish, blob)
+		hashToPublish = append(hashToPublish, hash)
+	}
+
+	// query URI
+	queryAccess := access[1]
+	if !queryAccess {
+		// grant dot
+		queryURI := uris[1]
+		params := &bw2.CreateDOTParams{
+			To:                key_vk,
+			TTL:               0,
+			Comment:           fmt.Sprintf("Access to archiver on URI %s", uri),
+			URI:               queryURI,
+			ExpiryDelta:       expiry,
+			AccessPermissions: "P",
+		}
+		hash, blob, err := bwclient.CreateDOT(params)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions P", key_vk, queryURI))
+		}
+		log.Info("Granting DOT", hash)
+		dotsToPublish = append(dotsToPublish, blob)
+		hashToPublish = append(hashToPublish, hash)
+	}
+
+	// response URI
+	responseAccess := access[2]
+	if !responseAccess {
+		// grant dot
+		responseURI := uris[2]
+		params := &bw2.CreateDOTParams{
+			To:                key_vk,
+			TTL:               0,
+			Comment:           fmt.Sprintf("Access to archiver on URI %s", uri),
+			URI:               responseURI,
+			ExpiryDelta:       expiry,
+			AccessPermissions: "C",
+		}
+		hash, blob, err := bwclient.CreateDOT(params)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Could not grant DOT to %s on %s with permissions C", key_vk, responseURI))
+		}
+		log.Info("Granting DOT", hash)
+		dotsToPublish = append(dotsToPublish, blob)
+		hashToPublish = append(hashToPublish, hash)
+	}
+
+	// TODO: EXPIRY EXPIRY EXPIRY gotta add it yo
+
+	var wg sync.WaitGroup
+	wg.Add(len(dotsToPublish))
+
+	quit := make(chan bool)
+	for idx, blob := range dotsToPublish {
+		blob := blob
+		hash := hashToPublish[idx]
+		go func(blob []byte, hash string) {
+			log.Info("Publishing DOT", hash)
+			defer wg.Done()
+			a, err := datmoney.PublishDOT(blob)
+			if err != nil {
+				log.Error(errors.Wrap(err, fmt.Sprintf("Could not publish DOT with hash %s", hash)))
+			} else {
+				log.Info(successcolor(fmt.Sprintf("Successfully published DOT %s", a)))
+			}
+		}(blob, hash)
+	}
+	// "status bar"
+	go func() {
+		tick := time.Tick(2 * time.Second)
+		for {
+			select {
+			case <-quit:
+				return
+			case <-tick:
+				fmt.Print(".")
+			}
+		}
+	}()
+	wg.Wait()
+	quit <- true
+
+	return nil
+}
+
+func checkAccess(bwclient *bw2.BW2Client, key, uri string) (uris []string, hasPermission []bool, err error) {
+
+	// first check if the archiver is alive:
+
+	// grab the list of archivers off of that URI
+	archivers, alives, err := scanWithClient(bwclient, uri)
+	if err != nil {
+		return
+	}
+
+	successcolor := ansi.ColorFunc("green")
+	foundcolor := ansi.ColorFunc("blue+h")
+	badcolor := ansi.ColorFunc("yellow+b")
+	foundArchiver := false
+	for idx, archiver := range archivers {
+		if archiver == uri {
+			ago := time.Since(alives[idx])
+			if ago.Minutes() < time.Duration(5*time.Minute).Minutes() {
+				fmt.Println(foundcolor(fmt.Sprintf("Found archiver at: %s (alive %v ago)", uri, ago)))
+				foundArchiver = true
+				break
+			} else {
+				fmt.Println(badcolor(fmt.Sprintf("Found old archiver at: %s (alive %v ago)", uri, ago)))
+				break
+			}
+		}
+	}
+	if !foundArchiver {
+		err = errors.New(fmt.Sprintf("No (live) archiver found at %s. Try checking the output of 'pundat scan <namespace>'", uri))
+		return
+	}
+
+	key_vk, err := resolveKey(bwclient, key)
+	if err != nil {
+		return
+	}
+
+	scanURI := uri + "/*/!meta/giles"                                                          // C (C*?)
+	queryURI := uri + "/s.giles/_/i.archiver/slot/query"                                       // (P)
+	responseURI := uri + "/s.giles/_/i.archiver/signal/" + key_vk[:len(key_vk)-1] + ",queries" // (C)
+	uris = []string{scanURI, queryURI, responseURI}
+	hasPermission = []bool{false, false, false}
+
+	// now check access
+	chain, err := bwclient.BuildAnyChain(scanURI, "C*", key_vk)
+	if err != nil {
+		err = errors.Wrapf(err, "Could not build chain on %s to %s", scanURI, key_vk)
+		return
+	}
+	if chain == nil {
+		err = errors.New(fmt.Sprintf("Key %s does not have a chain to find archivers (%s)", key_vk, scanURI))
+		return
+	} else {
+		hasPermission[0] = true
+	}
+
+	chain, err = bwclient.BuildAnyChain(queryURI, "P", key_vk)
+	if err != nil {
+		err = errors.Wrapf(err, "Could not build chain on %s to %s", queryURI, key_vk)
+		return
+	}
+	if chain == nil {
+		err = errors.New(fmt.Sprintf("Key %s does not have a chain to publish to the archiver (%s)", key_vk, queryURI))
+		return
+	} else {
+		hasPermission[1] = true
+	}
+
+	chain, err = bwclient.BuildAnyChain(responseURI, "C", key_vk)
+	if err != nil {
+		err = errors.Wrapf(err, "Could not build chain on %s to %s", responseURI, key_vk)
+		return
+	}
+	if chain == nil {
+		err = errors.New(fmt.Sprintf("Key %s does not have a chain to consume from the archiver (%s)", key_vk, responseURI))
+		return
+	} else {
+		hasPermission[2] = true
+	}
+
+	fmt.Println(successcolor(fmt.Sprintf("Key %s has access to archiver at %s\n", key_vk, uri)))
+
+	return
 }
 
 func doTime(c *cli.Context) error {
