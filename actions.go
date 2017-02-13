@@ -170,6 +170,7 @@ func doIQuery(c *cli.Context) error {
 	bwclient := bw2.ConnectOrExit(c.String("agent"))
 	vk := bwclient.SetEntityFileOrExit(c.String("entity"))
 	bwclient.OverrideAutoChainTo(true)
+	formattime := c.Bool("formattime")
 
 	if c.NArg() == 0 {
 		return errors.New("Need to specify a namespace or URI prefix of an archiver (can use 'pundat scan' to help)")
@@ -248,7 +249,11 @@ func doIQuery(c *cli.Context) error {
 			fmt.Println(md.Dump())
 		}
 		if !ts.IsEmpty() {
-			fmt.Println(ts.Dump())
+			if formattime {
+				fmt.Println(ts.DumpWithFormattedTime())
+			} else {
+				fmt.Println(ts.Dump())
+			}
 		}
 		if !ch.IsEmpty() {
 			fmt.Println(ch.Dump())

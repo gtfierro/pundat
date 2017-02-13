@@ -6,6 +6,7 @@ import (
 	"github.com/gtfierro/giles2/common"
 	bw2 "github.com/immesys/bw2bind"
 	"math"
+	"time"
 )
 
 const GilesQueryChangedRangesPIDString = "2.0.8.8"
@@ -77,6 +78,17 @@ func (msg QueryTimeseriesResult) Dump() string {
 	}
 	for _, ts := range msg.Stats {
 		res += ts.Dump()
+	}
+	return res
+}
+
+func (msg QueryTimeseriesResult) DumpWithFormattedTime() string {
+	var res string
+	for _, ts := range msg.Data {
+		res += ts.DumpWithFormattedTime()
+	}
+	for _, ts := range msg.Stats {
+		res += ts.DumpWithFormattedTime()
 	}
 	return res
 }
@@ -173,6 +185,19 @@ func (msg Timeseries) Dump() string {
 	}
 }
 
+func (msg Timeseries) DumpWithFormattedTime() string {
+	var res [][]interface{}
+	for i, timestamp := range msg.Times {
+		formattime := time.Unix(0, int64(timestamp))
+		res = append(res, []interface{}{formattime, msg.Values[i]})
+	}
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Timeseries": res}, "", "  "); err != nil {
+		return fmt.Sprintf("%+v", res)
+	} else {
+		return string(bytes)
+	}
+}
+
 type Statistics struct {
 	UUID       string
 	Generation uint64
@@ -201,6 +226,19 @@ func (msg Statistics) Dump() string {
 	var res [][]interface{}
 	for i, time := range msg.Times {
 		res = append(res, []interface{}{time, msg.Count[i], msg.Min[i], msg.Mean[i], msg.Max[i]})
+	}
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Generation": msg.Generation, "Timeseries": res}, "", "  "); err != nil {
+		return fmt.Sprintf("%+v", res)
+	} else {
+		return string(bytes)
+	}
+}
+
+func (msg Statistics) DumpWithFormattedTime() string {
+	var res [][]interface{}
+	for i, timestamp := range msg.Times {
+		formattime := time.Unix(0, int64(timestamp))
+		res = append(res, []interface{}{formattime, msg.Count[i], msg.Min[i], msg.Mean[i], msg.Max[i]})
 	}
 	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Generation": msg.Generation, "Timeseries": res}, "", "  "); err != nil {
 		return fmt.Sprintf("%+v", res)

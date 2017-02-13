@@ -63,6 +63,10 @@ func main() {
 					Usage:  "The entity to use",
 					EnvVar: "BW2_DEFAULT_ENTITY",
 				},
+				cli.BoolTFlag{
+					Name:  "formattime,f",
+					Usage: "If true, parse the timestamps in returned responses",
+				},
 			},
 		},
 		{
