@@ -38,7 +38,7 @@ func resolveKey(client *bw2.BW2Client, key string) (string, error) {
 		}
 		ent, ok := entity.(*objects.Entity)
 		if !ok {
-			return "", errors.New(fmt.Sprintf("File was not an entity:", key))
+			return "", errors.New(fmt.Sprintf("File was not an entity: %s", key))
 		}
 		key_vk := objects.FmtKey(ent.GetVK())
 		return key_vk, nil
@@ -49,11 +49,11 @@ func resolveKey(client *bw2.BW2Client, key string) (string, error) {
 			return "", errors.Wrapf(err, "Could not resolve key %s", key)
 		}
 		if b != bw2.StateValid {
-			return "", errors.New(fmt.Sprintf("Key was not valid:", key))
+			return "", errors.New(fmt.Sprintf("Key was not valid: %s", key))
 		}
 		ent, ok := a.(*objects.Entity)
 		if !ok {
-			return "", errors.New(fmt.Sprintf("Key was not an entity:", key))
+			return "", errors.New(fmt.Sprintf("Key was not an entity: %s", key))
 		}
 		key_vk := objects.FmtKey(ent.GetVK())
 		return key_vk, nil
