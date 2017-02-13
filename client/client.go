@@ -9,7 +9,7 @@ import (
 	"time"
 
 	messages "github.com/gtfierro/pundat/archiver"
-	bw "gopkg.in/immesys/bw2bind.v5"
+	bw "github.com/immesys/bw2bind"
 )
 
 const GilesQueryChangedRangesPIDString = "2.0.8.8"
