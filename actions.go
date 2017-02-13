@@ -501,7 +501,7 @@ func checkAccess(bwclient *bw2.BW2Client, key, uri string) (uris []string, hasPe
 		return
 	}
 
-	scanURI := uri + "/*/!meta/giles"                                                          // C (C*?)
+	scanURI := uri + "/*/s.giles/!meta/lastalive"                                              // (C*)
 	queryURI := uri + "/s.giles/_/i.archiver/slot/query"                                       // (P)
 	responseURI := uri + "/s.giles/_/i.archiver/signal/" + key_vk[:len(key_vk)-1] + ",queries" // (C)
 	uris = []string{scanURI, queryURI, responseURI}
