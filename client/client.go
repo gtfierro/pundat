@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -9,12 +10,14 @@ import (
 	"time"
 
 	messages "github.com/gtfierro/pundat/archiver"
-	bw "github.com/immesys/bw2bind"
+	bw "gopkg.in/immesys/bw2bind.v5"
 )
 
 const GilesQueryChangedRangesPIDString = "2.0.8.8"
 
 var GilesQueryChangedRangesPID = bw.FromDotForm(GilesQueryChangedRangesPIDString)
+
+var ErrNoResponse = errors.New("No response from archiver")
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -26,7 +29,7 @@ type PundatClient struct {
 	uri     string
 	c       chan *bw.SimpleMessage
 	waiting map[uint32]chan *bw.SimpleMessage
-	sync.RWMutex
+	l       sync.RWMutex
 }
 
 // Create a new API isntance w/ the given client and VerifyingKey.
@@ -55,7 +58,7 @@ func NewPundatClient(client *bw.BW2Client, vk string, uri string) (*PundatClient
 				log.Println(fmt.Sprintf("Error fetching nonce (%v)", err))
 				continue
 			}
-			pc.Lock()
+			pc.l.Lock()
 			if replyChan, found := pc.waiting[nonce]; found {
 				// throw it in if channel is listening, else drop it
 				select {
@@ -64,7 +67,7 @@ func NewPundatClient(client *bw.BW2Client, vk string, uri string) (*PundatClient
 				default:
 				}
 			}
-			pc.Unlock()
+			pc.l.Unlock()
 		}
 	}()
 
@@ -72,13 +75,14 @@ func NewPundatClient(client *bw.BW2Client, vk string, uri string) (*PundatClient
 }
 
 func (pc *PundatClient) markWaitFor(nonce uint32, replyChan chan *bw.SimpleMessage) {
-	pc.Lock()
+	pc.l.Lock()
 	pc.waiting[nonce] = replyChan
-	pc.Unlock()
+	pc.l.Unlock()
 }
 
-// synchronously queries
-func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult, tsRes messages.QueryTimeseriesResult, chRes messages.QueryChangedResult, err error) {
+// Synchronously queries the archiver. If no reply message is received within the given timeout (in seconds), this method returns ErrNoResponse. If timeout is <= 0,
+// this method will block until a response is received from the archiver; possibly forever!
+func (pc *PundatClient) Query(query string, timeout int) (mdRes messages.QueryMetadataResult, tsRes messages.QueryTimeseriesResult, chRes messages.QueryChangedResult, err error) {
 	var (
 		tsfound  bool
 		mdfound  bool
@@ -89,6 +93,12 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 	msg := messages.KeyValueQuery{
 		Query: query,
 		Nonce: nonce,
+	}
+
+	var timeoutChan <-chan time.Time
+
+	if timeout > 0 {
+		timeoutChan = time.After(time.Duration(timeout) * time.Second)
 	}
 
 	replyChan := make(chan *bw.SimpleMessage, 1)
@@ -102,28 +112,34 @@ func (pc *PundatClient) Query(query string) (mdRes messages.QueryMetadataResult,
 		err = fmt.Errorf("Could not publish (%v)", err)
 		return
 	}
-	for msg := range replyChan {
-		errfound, err = getError(nonce, msg)
-		if errfound {
+	for {
+		select {
+		case <-timeoutChan:
+			err = ErrNoResponse
 			return
-		}
-		tsfound, tsRes, err = getTimeseries(nonce, msg)
-		if err != nil {
-			return
-		}
-		mdfound, mdRes, err = getMetadata(nonce, msg)
-		if err != nil {
-			return
-		}
-		chfound, chRes, err = getChanged(nonce, msg)
-		if err != nil {
-			return
-		}
-		if tsfound || mdfound || chfound {
+		case msg := <-replyChan:
+			errfound, err = getError(nonce, msg)
+			if errfound {
+				return
+			}
+			tsfound, tsRes, err = getTimeseries(nonce, msg)
 			if err != nil {
 				return
 			}
-			break
+			mdfound, mdRes, err = getMetadata(nonce, msg)
+			if err != nil {
+				return
+			}
+			chfound, chRes, err = getChanged(nonce, msg)
+			if err != nil {
+				return
+			}
+			if tsfound || mdfound || chfound {
+				if err != nil {
+					return
+				}
+				return
+			}
 		}
 	}
 	return
