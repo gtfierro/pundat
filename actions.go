@@ -183,6 +183,7 @@ func doIQuery(c *cli.Context) error {
 		return err
 	}
 
+	var foundArchiver = false
 	res, err := bwclient.Query(&bw2.QueryParams{
 		URI: archiverURI + "/s.giles/!meta/lastalive",
 	})
@@ -190,6 +191,7 @@ func doIQuery(c *cli.Context) error {
 		log.Error(err)
 	} else {
 		for msg := range res {
+			foundArchiver = true
 			uri, lastalive, err := getArchiverAlive(msg)
 			if err != nil {
 				log.Error(errors.Wrapf(err, "Could not retrive archiver last alive time at %s", uri))
@@ -202,6 +204,10 @@ func doIQuery(c *cli.Context) error {
 				log.Infof("Archiver at %s last alive at %v (%v ago)", c.String("archiver"), lastalive, ago)
 			}
 		}
+	}
+
+	if !foundArchiver {
+		log.Fatalf("No archiver found at %s", archiverURI)
 	}
 
 	currentUser, err := user.Current()
@@ -272,6 +278,10 @@ func doScan(c *cli.Context) error {
 	archivers, times, err := scan(c.Args().Get(0), c.String("entity"), c.String("agent"))
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(archivers) == 0 {
+		log.Fatalf("No archiver found at %s", c.Args().Get(0))
 	}
 
 	for i := 0; i < len(archivers); i++ {
