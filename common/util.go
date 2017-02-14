@@ -8,19 +8,20 @@ import (
 	"time"
 )
 
+// we use 1/1/2150 as the "upper bound" for guessing timestamps
 const (
-	S_LOW  uint64 = 2 << 30
-	MS_LOW uint64 = 2 << 39
-	US_LOW uint64 = 2 << 50
-	NS_LOW uint64 = 2 << 58
+	S_HIGH  uint64 = 5680281600
+	MS_HIGH uint64 = 5680281600000
+	US_HIGH uint64 = 5680281600000000
+	NS_HIGH uint64 = 5680281600000000000
 )
 
 func GuessTimeUnit(val uint64) UnitOfTime {
-	if val < MS_LOW {
+	if val < S_HIGH {
 		return UOT_S
-	} else if val < US_LOW {
+	} else if val < MS_HIGH {
 		return UOT_MS
-	} else if val < NS_LOW {
+	} else if val < US_HIGH {
 		return UOT_US
 	}
 	return UOT_NS
