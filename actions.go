@@ -25,7 +25,7 @@ import (
 )
 
 func resolveKey(client *bw2.BW2Client, key string) (string, error) {
-	if _, err := os.Stat(key); err != nil && err != os.ErrNotExist {
+	if _, err := os.Stat(key); err != nil && !os.IsNotExist(err) {
 		return "", errors.Wrap(err, "Could not check key file")
 	} else if err == nil {
 		// have a file and load it!
