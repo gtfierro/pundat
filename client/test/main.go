@@ -18,7 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	md, ts, ch, err := pc.Query(os.Args[1])
+	md, ts, ch, err := pc.Query(os.Args[1], 10)
 
 	fmt.Println("md", md)
 	fmt.Println("ts", ts)
