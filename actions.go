@@ -231,6 +231,7 @@ func doIQuery(c *cli.Context) error {
 		if !ch.IsEmpty() {
 			fmt.Println(ch.Dump())
 		}
+		return nil
 	}
 
 	currentUser, err := user.Current()
