@@ -104,6 +104,15 @@ func NewPundatClient(client *bw.BW2Client, vk string, uri string) (*PundatClient
 	return pc, nil
 }
 
+// allow pundat to build its own client, if package import errors prevent you from
+// specifying a gopkg.in-derived BW2Client
+func NewPundatClientFromConfig(entity, agent, uri string) (*PundatClient, error) {
+	bwclient := bw.ConnectOrExit(agent)
+	vk := bwclient.SetEntityFileOrExit(entity)
+	bwclient.OverrideAutoChainTo(true)
+	return NewPundatClient(bwclient, vk, uri)
+}
+
 func (pc *PundatClient) markWaitFor(nonce uint32, replyChan chan *bw.SimpleMessage) {
 	pc.l.Lock()
 	pc.waiting[nonce] = replyChan
