@@ -54,7 +54,7 @@ func (msg QueryMetadataResult) Dump() string {
 	for _, kv := range msg.Data {
 		res = append(res, kv.Dump())
 	}
-	return "[" + strings.Join(res, ",") + "]"
+	return "[\n" + strings.Join(res, ",\n") + "\n]"
 }
 
 func (msg QueryMetadataResult) IsEmpty() bool {
@@ -80,7 +80,7 @@ func (msg QueryTimeseriesResult) Dump() string {
 	for _, ts := range msg.Stats {
 		res = append(res, ts.Dump())
 	}
-	return "[" + strings.Join(res, ",") + "]"
+	return "[\n" + strings.Join(res, ",\n") + "\n]"
 }
 
 func (msg QueryTimeseriesResult) DumpWithFormattedTime() string {
@@ -91,7 +91,7 @@ func (msg QueryTimeseriesResult) DumpWithFormattedTime() string {
 	for _, ts := range msg.Stats {
 		res = append(res, ts.DumpWithFormattedTime())
 	}
-	return "[" + strings.Join(res, ",") + "]"
+	return "[\n" + strings.Join(res, ",\n") + "\n]"
 }
 
 func (msg QueryTimeseriesResult) IsEmpty() bool {
@@ -113,7 +113,7 @@ func (msg QueryChangedResult) Dump() string {
 	for _, cr := range msg.Changed {
 		res = append(res, cr.Dump())
 	}
-	return "[" + strings.Join(res, ",") + "]"
+	return "[\n" + strings.Join(res, ",\n") + "\n]"
 }
 
 func (msg QueryChangedResult) IsEmpty() bool {
