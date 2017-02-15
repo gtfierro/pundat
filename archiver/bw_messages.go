@@ -6,6 +6,7 @@ import (
 	"github.com/gtfierro/giles2/common"
 	bw2 "github.com/immesys/bw2bind"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -49,11 +50,11 @@ func (msg QueryMetadataResult) ToMsgPackBW() (po bw2.PayloadObject) {
 }
 
 func (msg QueryMetadataResult) Dump() string {
-	var res string
+	var res []string
 	for _, kv := range msg.Data {
-		res += kv.Dump()
+		res = append(res, kv.Dump())
 	}
-	return res
+	return strings.Join(res, ",")
 }
 
 func (msg QueryMetadataResult) IsEmpty() bool {
@@ -72,25 +73,25 @@ func (msg QueryTimeseriesResult) ToMsgPackBW() (po bw2.PayloadObject) {
 }
 
 func (msg QueryTimeseriesResult) Dump() string {
-	var res string
+	var res []string
 	for _, ts := range msg.Data {
-		res += ts.Dump()
+		res = append(res, ts.Dump())
 	}
 	for _, ts := range msg.Stats {
-		res += ts.Dump()
+		res = append(res, ts.Dump())
 	}
-	return res
+	return strings.Join(res, ",")
 }
 
 func (msg QueryTimeseriesResult) DumpWithFormattedTime() string {
-	var res string
+	var res []string
 	for _, ts := range msg.Data {
-		res += ts.DumpWithFormattedTime()
+		res = append(res, ts.DumpWithFormattedTime())
 	}
 	for _, ts := range msg.Stats {
-		res += ts.DumpWithFormattedTime()
+		res = append(res, ts.DumpWithFormattedTime())
 	}
-	return res
+	return strings.Join(res, ",")
 }
 
 func (msg QueryTimeseriesResult) IsEmpty() bool {
@@ -108,11 +109,11 @@ func (msg QueryChangedResult) ToMsgPackBW() (po bw2.PayloadObject) {
 }
 
 func (msg QueryChangedResult) Dump() string {
-	var res string
+	var res []string
 	for _, cr := range msg.Changed {
-		res += cr.Dump()
+		res = append(res, cr.Dump())
 	}
-	return res
+	return strings.Join(res, ",")
 }
 
 func (msg QueryChangedResult) IsEmpty() bool {
