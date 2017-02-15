@@ -190,6 +190,14 @@ func (a *Archiver) HandleQuery(vk, query string) (mdResult []common.MetadataGrou
 			var results []string
 			params := parsed.GetParams().(*common.DistinctParams)
 			results, err = a.DistinctTag(vk, params)
+			// sandwidth the results into a metadata record
+			record := &common.MetadataRecord{
+				Key:   params.Tag,
+				Value: results,
+			}
+			mdResult = []common.MetadataGroup{
+				{Records: map[string]*common.MetadataRecord{params.Tag: record}},
+			}
 			log.Debug("DISTINCT", results)
 			return
 		}

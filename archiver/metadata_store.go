@@ -260,12 +260,18 @@ func (m *mongoStore) GetDistinct(VK string, tag string, where common.Dict) ([]st
 	var (
 		whereClause bson.M
 		distincts   []string
+		v           []interface{}
 	)
 	if len(where) != 0 {
 		whereClause = where.ToBSON()
 	}
-	if err := m.metadata.Find(whereClause).Distinct(tag, &distincts); err != nil {
+	if err := m.documents.Find(whereClause).Distinct(tag, &v); err != nil {
 		return nil, errors.Wrap(err, "Could not get the thing")
+	}
+	for _, val := range v {
+		if str, ok := val.(string); ok {
+			distincts = append(distincts, str)
+		}
 	}
 	return distincts, nil
 }
