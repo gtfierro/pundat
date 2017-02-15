@@ -210,6 +210,29 @@ func doIQuery(c *cli.Context) error {
 		log.Fatalf("No archiver found at %s", archiverURI)
 	}
 
+	// check if we have a query specified to run
+	user_query := c.String("query")
+	if user_query != "" {
+		md, ts, ch, err := pc.Query(user_query, c.Int("timeout"))
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+		if !md.IsEmpty() {
+			fmt.Println(md.Dump())
+		}
+		if !ts.IsEmpty() {
+			if formattime {
+				fmt.Println(ts.DumpWithFormattedTime())
+			} else {
+				fmt.Println(ts.Dump())
+			}
+		}
+		if !ch.IsEmpty() {
+			fmt.Println(ch.Dump())
+		}
+	}
+
 	currentUser, err := user.Current()
 	if err != nil {
 		return err
@@ -247,7 +270,7 @@ func doIQuery(c *cli.Context) error {
 			fmt.Println(err)
 			break
 		}
-		md, ts, ch, err := pc.Query(line)
+		md, ts, ch, err := pc.Query(line, c.Int("timeout"))
 		if err != nil {
 			fmt.Println(err)
 			continue

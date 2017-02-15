@@ -67,6 +67,16 @@ func main() {
 					Name:  "formattime,f",
 					Usage: "If true, parse the timestamps in returned responses",
 				},
+				cli.StringFlag{
+					Name:  "query,q",
+					Value: "",
+					Usage: "If specified, evaluate this query and print the results on stdout. If not specified, use the interactive query",
+				},
+				cli.IntFlag{
+					Name:  "timeout,t",
+					Value: 30,
+					Usage: "Timeout in seconds to wait for a reply from the archiver",
+				},
 			},
 		},
 		{
