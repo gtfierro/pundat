@@ -169,7 +169,7 @@ func makeConfig(c *cli.Context) error {
 func doIQuery(c *cli.Context) error {
 	bw2.SilenceLog()
 	bwclient := bw2.ConnectOrExit(c.String("agent"))
-	vk := bwclient.SetEntityFileOrExit(c.String("entity"))
+	bwclient.SetEntityFileOrExit(c.String("entity"))
 	bwclient.OverrideAutoChainTo(true)
 	formattime := c.Bool("formattime")
 
@@ -178,7 +178,7 @@ func doIQuery(c *cli.Context) error {
 	}
 	archiverURI := c.Args().Get(0)
 
-	pc, err := client.NewPundatClient(bwclient, vk, archiverURI)
+	pc, err := client.NewPundatClientFromConfig(c.String("entity"), c.String("agent"), archiverURI)
 	if err != nil {
 		return err
 	}
