@@ -132,6 +132,11 @@ func (a *Archiver) packResults(params *common.DataParams, readings []common.Time
 			if params.DataLimit > 0 && len(resp.Records) > params.DataLimit {
 				resp.Records = resp.Records[:params.DataLimit]
 			}
+			// mark timestamps by how they should be transformed
+			for idx, rdg := range resp.Records {
+				rdg.Unit = params.ConvertToUnit
+				resp.Records[idx] = rdg
+			}
 			readings[i] = resp
 		}
 		resp.Unlock()
@@ -147,6 +152,11 @@ func (a *Archiver) packStatsResults(params *common.DataParams, readings []common
 			// apply data limit if exists
 			if params.DataLimit > 0 && len(resp.Records) > params.DataLimit {
 				resp.Records = resp.Records[:params.DataLimit]
+			}
+			// mark timestamps by how they should be transformed
+			for idx, rdg := range resp.Records {
+				rdg.Unit = params.ConvertToUnit
+				resp.Records[idx] = rdg
 			}
 			readings[i] = resp
 		}

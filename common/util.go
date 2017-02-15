@@ -86,6 +86,21 @@ func ConvertTime(time uint64, stream_uot, target_uot UnitOfTime) (uint64, error)
 	return returnTime, nil
 }
 
+// interprets the time as the given unit and returns that
+func TimeAsUnit(t time.Time, unit UnitOfTime) uint64 {
+	switch unit {
+	case UOT_S:
+		return uint64(t.Unix())
+	case UOT_MS:
+		return uint64(t.UnixNano() / 1000000)
+	case UOT_US:
+		return uint64(t.UnixNano() / 1000)
+	case UOT_NS:
+		return uint64(t.UnixNano())
+	}
+	return 0
+}
+
 func (u UnitOfTime) String() string {
 	switch u {
 	case UOT_NS:

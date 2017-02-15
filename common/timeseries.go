@@ -12,23 +12,23 @@ var EmptyStatisticTimeseries = []StatisticTimeseries{}
 type TimeseriesReading struct {
 	// uint64 timestamp
 	Time time.Time
+	Unit UnitOfTime
 	// value associated with this timestamp
 	Value float64
 }
 
 func (s *TimeseriesReading) EncodeMsgpack(enc *msgpack.Encoder) error {
-	//TODO: encode as int64
 	return enc.Encode(s.Time, s.Value)
 }
 
 func (s *TimeseriesReading) DecodeMsgpack(enc *msgpack.Decoder) error {
-	//TODO: encode as int64
-	return enc.Decode(&s.Time, &s.Value)
+	return enc.Decode(s.Time, s.Value)
 }
 
 type StatisticsReading struct {
 	// uint64 timestamp
 	Time  time.Time
+	Unit  UnitOfTime
 	Count uint64
 	Min   float64
 	Mean  float64
