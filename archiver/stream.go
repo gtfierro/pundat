@@ -113,6 +113,7 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 								value_f64 = float64(value_i64)
 							} else {
 								log.Errorf("Value %+v was not a float64 (was %T)", value, value)
+								continue
 							}
 						}
 						ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
@@ -126,8 +127,8 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 							value_f64 = float64(value_i64)
 						} else {
 							log.Errorf("Value %+v was not a float64 (was %T)", value, value)
+							continue
 						}
-						continue
 					}
 					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 				}
