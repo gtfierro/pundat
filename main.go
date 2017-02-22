@@ -190,6 +190,95 @@ func main() {
 				},
 			},
 		},
+		// archive request commands
+		{
+			Name:   "listreq",
+			Usage:  "List all archive requests persisted on the given URI pattern",
+			Action: listArchiveRequests,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
+					Name:   "entity,e",
+					Value:  "",
+					Usage:  "The entity to use",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+			},
+		},
+		{
+			Name:   "rmreq",
+			Usage:  "Remove archive requests specified by file",
+			Action: rmConfig,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "config,c",
+					Usage: "Archive request YAML file",
+				},
+				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
+					Name:   "entity,e",
+					Value:  "",
+					Usage:  "The entity to use",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+			},
+		},
+		{
+			Name:   "addreq",
+			Usage:  "Load archive requests from config file",
+			Action: addConfig,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "config,c",
+					Value: "archive.yml",
+					Usage: "Config file to parse for archive requests",
+				},
+				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
+					Name:   "entity,e",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+					Usage:  "The entity to use",
+				},
+			},
+		},
+		{
+			Name:   "nukereq",
+			Usage:  "Remove ALL archive requests attached at the given URI",
+			Action: nukeArchiveRequests,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "uri, u",
+					Usage: "URI to remove archive requests from",
+				},
+				cli.StringFlag{
+					Name:   "agent,a",
+					Value:  "127.0.0.1:28589",
+					Usage:  "Local BOSSWAVE Agent",
+					EnvVar: "BW2_AGENT",
+				},
+				cli.StringFlag{
+					Name:   "entity,e",
+					Value:  "",
+					Usage:  "The entity to use",
+					EnvVar: "BW2_DEFAULT_ENTITY",
+				},
+			},
+		},
 		{
 			Name:   "gettime",
 			Usage:  "Convert a time expression into a Unix nano timestamp. No arguments => returns current time",
