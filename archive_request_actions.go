@@ -35,7 +35,7 @@ func rmConfig(c *cli.Context) error {
 	bwclient := bw2.ConnectOrExit(c.String("agent"))
 	bwclient.SetEntityFileOrExit(c.String("entity"))
 	bwclient.OverrideAutoChainTo(true)
-	return requests.RemoveArchiveRequestsFromConfig(bwclient, c.String("config"), c.String("uri"))
+	return requests.RemoveArchiveRequestsFromConfig(bwclient, c.String("config"))
 }
 
 func addConfig(c *cli.Context) error {

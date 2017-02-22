@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	messages "github.com/gtfierro/pundat/archiver"
+	"github.com/immesys/bw2/objects"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/pkg/errors"
 )
@@ -27,7 +28,7 @@ func (req *ArchiveRequest) SameAs(other *ArchiveRequest) bool {
 
 // checks URI and Name
 func (req *ArchiveRequest) LooseSameAs(other *ArchiveRequest) bool {
-	return req != nil && other != nil && req.Name == other.Name && req.URI == other.URI
+	return req != nil && other != nil && req.Name == other.Name && req.URI == other.URI && req.AttachURI == other.AttachURI
 }
 
 func (req *ArchiveRequest) Dump() {
@@ -63,6 +64,7 @@ func GetArchiveRequests(client *bw2.BW2Client, uri string) ([]*ArchiveRequest, e
 					return requests, err
 				}
 				req.FromVK = msg.From
+				req.AttachURI = normalizeNamespace(client, msg.URI)
 				requests = append(requests, req)
 			}
 		}
@@ -83,7 +85,7 @@ func RemoveAllArchiveRequests(client *bw2.BW2Client, uri string) error {
 	return nil
 }
 
-func RemoveArchiveRequestsFromConfig(client *bw2.BW2Client, configFile string, uri string) error {
+func RemoveArchiveRequestsFromConfig(client *bw2.BW2Client, configFile string) error {
 	config, err := ReadConfig(configFile)
 	if err != nil {
 		return errors.Wrap(err, "Could not read config")
@@ -92,29 +94,46 @@ func RemoveArchiveRequestsFromConfig(client *bw2.BW2Client, configFile string, u
 	for _, req := range config.DummyArchiveRequests {
 		remove = append(remove, req.ToArchiveRequest())
 	}
-	return RemoveArchiveRequestList(client, uri, remove...)
+	return RemoveArchiveRequestList(client, remove...)
 }
 
 // removes the set of archive requests using URI and Name
-func RemoveArchiveRequestList(client *bw2.BW2Client, uri string, removeRequests ...*ArchiveRequest) error {
-	uriFull := strings.TrimSuffix(uri, "/") + "/!meta/giles"
-	requests, err := GetArchiveRequests(client, uriFull)
-	if err != nil {
-		return errors.Wrap(err, "Could not retrieve ArchiveRequests")
+func RemoveArchiveRequestList(client *bw2.BW2Client, removeRequests ...*ArchiveRequest) error {
+	var scanuris = make(map[string]struct{})
+	// make list of URIs to check
+	for _, rem := range removeRequests {
+		rem.AttachURI = normalizeNamespace(client, rem.AttachURI)
+		scanuris[rem.AttachURI] = struct{}{}
+		rem.AttachURI = addGilesSuffix(rem.AttachURI)
 	}
-	var keep []*ArchiveRequest
-requestLoop:
-	for _, req := range requests {
-		for _, rem := range removeRequests {
-			if rem.LooseSameAs(req) {
-				continue requestLoop
+
+	// for each uri, get the list of archive requests. We filter this by those that we want
+	// removed, and then re-publish the altered list
+	for uri := range scanuris {
+		fmt.Println(uri)
+		var keep []*ArchiveRequest
+		requests, err := GetArchiveRequests(client, uri)
+		if err != nil {
+			return err
+		}
+	requestLoop:
+		for _, req := range requests {
+			for _, rem := range removeRequests {
+				if rem.LooseSameAs(req) {
+					continue requestLoop
+				}
+			}
+			keep = append(keep, req)
+		}
+		// re-attach what's left
+		if len(keep) == 0 {
+			return RemoveAllArchiveRequests(client, uri)
+		} else {
+			err = AttachArchiveRequests(client, uri, keep...)
+			if err != nil {
+				return errors.Wrap(err, "Could not set ArchiveRequests")
 			}
 		}
-		keep = append(keep, req)
-	}
-	err = AttachArchiveRequests(client, uri, keep...)
-	if err != nil {
-		return errors.Wrap(err, "Could not set ArchiveRequests")
 	}
 
 	return nil
@@ -163,7 +182,8 @@ func AttachArchiveRequests(client *bw2.BW2Client, uri string, requests ...*Archi
 	for _, existing := range existingRequests {
 		for _, request := range requests {
 			if request.LooseSameAs(existing) {
-				return errors.New("Request already exists")
+				fmt.Println("Request already exists:")
+				existing.Dump()
 			}
 		}
 	}
@@ -211,4 +231,37 @@ func compareStringSliceAsSet(s1, s2 []string) bool {
 	}
 
 	return true
+}
+
+// if the string does not end with /!meta/giles, it adds it
+func addGilesSuffix(uri string) string {
+	if !strings.HasSuffix(uri, "/!meta/giles") {
+		return strings.TrimSuffix(uri, "/") + "/!meta/giles"
+	}
+	return uri
+}
+
+func resolveAliasToVK(client *bw2.BW2Client, alias string) string {
+	obj, validity, err := client.ResolveRegistry(alias)
+	if err != nil {
+		fmt.Println("Error resolving alias", err)
+		return alias
+	}
+	if validity != bw2.StateValid {
+		fmt.Printf("Alias %s is not valid\n", alias)
+		return alias
+	}
+
+	ent, ok := obj.(*objects.Entity)
+	if !ok {
+		fmt.Printf("Alias was not an entity: %s\n", alias)
+		return alias
+	}
+	return objects.FmtKey(ent.GetVK())
+}
+
+// replaces the namespace alias in the URI with its VK
+func normalizeNamespace(client *bw2.BW2Client, uri string) string {
+	components := strings.SplitN(uri, "/", 2)
+	return resolveAliasToVK(client, components[0]) + "/" + components[1]
 }

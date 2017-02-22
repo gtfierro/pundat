@@ -3,8 +3,8 @@ package archiver
 import (
 	"fmt"
 	"github.com/fatih/color"
-	"github.com/satori/go.uuid"
 	bw2 "github.com/immesys/bw2bind"
+	"github.com/satori/go.uuid"
 	"sync"
 )
 
@@ -24,6 +24,8 @@ type ArchiveRequest struct {
 	// on <uri>/!meta/giles, then if the URI field was elided it would default
 	// to <uri>.
 	URI string
+	// the URI where this archive request was attached (not populated by user)
+	AttachURI string
 	// Extracts objects of the given Payload Object type from all messages
 	// published on the URI. If elided, operates on all PO types.
 	PO int

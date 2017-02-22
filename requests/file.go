@@ -44,6 +44,7 @@ func (d DummyArchiveRequest) ToArchiveRequest() *ArchiveRequest {
 	}
 	req := &ArchiveRequest{
 		URI:             d.ArchiveURI,
+		AttachURI:       d.AttachURI,
 		PO:              bw2.FromDotForm(d.PO),
 		UUIDExpr:        d.UUIDExpr,
 		ValueExpr:       d.ValueExpr,
