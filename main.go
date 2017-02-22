@@ -21,6 +21,7 @@ func init() {
 func main() {
 	app := cli.NewApp()
 	app.Name = "pundat"
+	app.Usage = "An archiver for BOSSWAVE"
 	app.Version = "0.1"
 
 	app.Commands = []cli.Command{
@@ -193,7 +194,7 @@ func main() {
 		// archive request commands
 		{
 			Name:   "listreq",
-			Usage:  "List all archive requests persisted on the given URI pattern",
+			Usage:  "List all archive requests persisted on the given URI pattern (docs: https://git.io/vDjmW)",
 			Action: listArchiveRequests,
 			Flags: []cli.Flag{
 				cli.StringFlag{
@@ -212,7 +213,7 @@ func main() {
 		},
 		{
 			Name:   "rmreq",
-			Usage:  "Remove archive requests specified by file",
+			Usage:  "Remove archive requests specified by file (docs: https://git.io/vDjmW)",
 			Action: rmConfig,
 			Flags: []cli.Flag{
 				cli.StringFlag{
@@ -235,7 +236,7 @@ func main() {
 		},
 		{
 			Name:   "addreq",
-			Usage:  "Load archive requests from config file",
+			Usage:  "Load archive requests from config file (docs: https://git.io/vDjmW)",
 			Action: addConfig,
 			Flags: []cli.Flag{
 				cli.StringFlag{
@@ -258,7 +259,7 @@ func main() {
 		},
 		{
 			Name:   "nukereq",
-			Usage:  "Remove ALL archive requests attached at the given URI",
+			Usage:  "Remove ALL archive requests attached at the given URI (docs: https://git.io/vDjmW)",
 			Action: nukeArchiveRequests,
 			Flags: []cli.Flag{
 				cli.StringFlag{
