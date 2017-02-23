@@ -46,7 +46,7 @@ func (req *ArchiveRequest) GetPO() (bw2.PayloadObject, error) {
 // with `+` and `*` in the URI if your permissions allow.
 func GetArchiveRequests(client *bw2.BW2Client, uri string) ([]*ArchiveRequest, error) {
 	// generate the query URI
-	uri = strings.TrimSuffix(uri, "/") + "/!meta/giles"
+	uri = addGilesSuffix(uri)
 	fmt.Printf("RETRIEVING from %s\n", uri)
 	queryResults, err := client.Query(&bw2.QueryParams{
 		URI:       uri,
@@ -73,7 +73,7 @@ func GetArchiveRequests(client *bw2.BW2Client, uri string) ([]*ArchiveRequest, e
 }
 
 func RemoveAllArchiveRequests(client *bw2.BW2Client, uri string) error {
-	uriFull := strings.TrimSuffix(uri, "/") + "/!meta/giles"
+	uriFull := addGilesSuffix(uri)
 	fmt.Printf("DELETING ALL on %s\n", uriFull)
 	// delete all
 	return client.Publish(&bw2.PublishParams{
@@ -129,7 +129,7 @@ func RemoveArchiveRequestList(client *bw2.BW2Client, removeRequests ...*ArchiveR
 		if len(keep) == 0 {
 			return RemoveAllArchiveRequests(client, uri)
 		} else {
-			err = AttachArchiveRequests(client, uri, keep...)
+			err = AttachArchiveRequests(client, keep...)
 			if err != nil {
 				return errors.Wrap(err, "Could not set ArchiveRequests")
 			}
@@ -139,7 +139,7 @@ func RemoveArchiveRequestList(client *bw2.BW2Client, removeRequests ...*ArchiveR
 	return nil
 }
 
-func AddArchiveRequestsFromConfig(client *bw2.BW2Client, configFile, uri string) error {
+func AddArchiveRequestsFromConfig(client *bw2.BW2Client, configFile string) error {
 	config, err := ReadConfig(configFile)
 	if err != nil {
 		return errors.Wrap(err, "Could not read config")
@@ -148,18 +148,15 @@ func AddArchiveRequestsFromConfig(client *bw2.BW2Client, configFile, uri string)
 	for _, req := range config.DummyArchiveRequests {
 		attach = append(attach, req.ToArchiveRequest())
 	}
-	return AttachArchiveRequests(client, uri, attach...)
+	return AttachArchiveRequests(client, attach...)
 }
 
 // Attaches the archive request to the given URI. The request will be packed as a
 // GilesArchiveRequestPID MsgPack object and attached to <uri>/!meta/giles.
 // The URI does not have to be fully specified: if your permissions allow, you can
 // also request that multiple URIs be archived using a `*` or `+` in the URI.
-func AttachArchiveRequests(client *bw2.BW2Client, uri string, requests ...*ArchiveRequest) error {
+func AttachArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) error {
 	// sanity check the parameters
-	if uri == "" {
-		return errors.New("Need a valid URI")
-	}
 	for _, request := range requests {
 		if request.PO == 0 {
 			return errors.New("Need a valid PO number")
@@ -170,42 +167,46 @@ func AttachArchiveRequests(client *bw2.BW2Client, uri string, requests ...*Archi
 		if request.Name == "" {
 			return errors.New("Need a Name")
 		}
+		request.AttachURI = normalizeNamespace(client, addGilesSuffix(request.AttachURI))
 	}
 
-	// generate the publish URI
-	uriFull := strings.TrimSuffix(uri, "/") + "/!meta/giles"
-
-	existingRequests, err := GetArchiveRequests(client, uri)
-	if err != nil {
-		return errors.Wrap(err, "Could not fetch existing Archive Requests")
-	}
-	for _, existing := range existingRequests {
-		for _, request := range requests {
+requestLoop:
+	for _, request := range requests {
+		existingRequests, err := GetArchiveRequests(client, request.AttachURI)
+		if err != nil {
+			return errors.Wrap(err, "Could not fetch existing Archive Requests")
+		}
+		// add requests to existingRequests if they are not already in there
+		for _, existing := range existingRequests {
 			if request.LooseSameAs(existing) {
 				fmt.Println("Request already exists:")
 				existing.Dump()
+				continue requestLoop
 			}
 		}
-	}
+		existingRequests = append(existingRequests, request)
+		var pos []bw2.PayloadObject
+		for _, req := range existingRequests {
+			if po, err := req.GetPO(); err == nil {
+				pos = append(pos, po)
+			} else {
+				return err
+			}
+		}
 
-	var pos []bw2.PayloadObject
-	for _, req := range append(existingRequests, requests...) {
-		if po, err := req.GetPO(); err == nil {
-			pos = append(pos, po)
-		} else {
+		fmt.Printf("ATTACHING to %s\n", request.AttachURI)
+		// attach the metadata
+		err = client.Publish(&bw2.PublishParams{
+			URI:            request.AttachURI,
+			PayloadObjects: pos,
+			Persist:        true,
+			AutoChain:      true,
+		})
+		if err != nil {
 			return err
 		}
 	}
-
-	fmt.Printf("ATTACHING to %s\n", uriFull)
-	// attach the metadata
-	err = client.Publish(&bw2.PublishParams{
-		URI:            uriFull,
-		PayloadObjects: pos,
-		Persist:        true,
-		AutoChain:      true,
-	})
-	return err
+	return nil
 }
 
 func compareStringSliceAsSet(s1, s2 []string) bool {

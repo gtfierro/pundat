@@ -43,7 +43,7 @@ func addConfig(c *cli.Context) error {
 	bwclient := bw2.ConnectOrExit(c.String("agent"))
 	bwclient.SetEntityFileOrExit(c.String("entity"))
 	bwclient.OverrideAutoChainTo(true)
-	return requests.AddArchiveRequestsFromConfig(bwclient, c.String("config"), c.String("uri"))
+	return requests.AddArchiveRequestsFromConfig(bwclient, c.String("config"))
 }
 
 func nukeArchiveRequests(c *cli.Context) error {
