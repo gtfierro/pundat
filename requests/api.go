@@ -148,14 +148,55 @@ func AddArchiveRequestsFromConfig(client *bw2.BW2Client, configFile string) erro
 	for _, req := range config.DummyArchiveRequests {
 		attach = append(attach, req.ToArchiveRequest())
 	}
-	return AttachArchiveRequests(client, attach...)
+	return MergeArchiveRequests(client, attach...)
+}
+
+func AttachArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) error {
+	var toadd = make(map[string][]*ArchiveRequest)
+	// sanity check the parameters
+	for _, request := range requests {
+		if request.PO == 0 {
+			return errors.New("Need a valid PO number")
+		}
+		if request.ValueExpr == "" {
+			return errors.New("Need a Value expression")
+		}
+		if request.Name == "" {
+			return errors.New("Need a Name")
+		}
+		request.AttachURI = normalizeNamespace(client, addGilesSuffix(request.AttachURI))
+		toadd[request.AttachURI] = append(toadd[request.AttachURI], request)
+	}
+	for uri, requests := range toadd {
+		var pos []bw2.PayloadObject
+		for _, req := range requests {
+			if po, err := req.GetPO(); err == nil {
+				pos = append(pos, po)
+			} else {
+				return err
+			}
+		}
+
+		fmt.Printf("ATTACHING to %s\n", uri)
+		// attach the metadata
+		err := client.Publish(&bw2.PublishParams{
+			URI:            uri,
+			PayloadObjects: pos,
+			Persist:        true,
+			AutoChain:      true,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Attaches the archive request to the given URI. The request will be packed as a
 // GilesArchiveRequestPID MsgPack object and attached to <uri>/!meta/giles.
 // The URI does not have to be fully specified: if your permissions allow, you can
 // also request that multiple URIs be archived using a `*` or `+` in the URI.
-func AttachArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) error {
+func MergeArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) error {
 	// sanity check the parameters
 	for _, request := range requests {
 		if request.PO == 0 {
