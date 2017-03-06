@@ -41,10 +41,13 @@ func (s *Stream) URI() string {
 	return s.uri
 }
 
+//
 func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
-	//TODO: Consider batching delivering new readings to BtrDB
-	// Right now we deliver readings one by one to BtrDB. If the serialization becomes
-	// a bottleneck, we should batch readings to amortize that cost
+	// TODO: consider having a set of worker threads for handling subscriptions.
+	// If this is high-enough volume, then we may end up dropping some messages
+	// Maybe make a super large buffer channel (e.g. 10000 messages?) Have one goroutine
+	// dump into that channel, and then have a set of worker threads consume that. Need a way
+	// of scaling up/down the processing of that channel
 	go func() {
 		// for each message we receive
 		for msg := range s.subscription {
@@ -132,6 +135,20 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 					}
 					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 				}
+
+				// We will check the cache first (using new interface call into btrdb)
+				// and create the stream object if it doesn't exist.
+				if exists, err := timeseriesStore.StreamExists(currentUUID); err != nil {
+					log.Error(errors.Wrapf(err, "Could not check stream exists (%s)", currentUUID.String()))
+					continue
+				} else if !exists {
+					if err := timeseriesStore.RegisterStream(currentUUID, msg.URI, s.name); err != nil {
+						log.Error(errors.Wrapf(err, "Could not create stream (%s %s %s)", currentUUID.String(), msg.URI, s.name))
+						continue
+					}
+				}
+
+				// now we can assume the stream exists and can write to it
 				if err := timeseriesStore.AddReadings(ts); err != nil {
 					log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
 				}
