@@ -334,3 +334,13 @@ func (bdb *btrIface) ValidTimestamp(time uint64, uot common.UnitOfTime) bool {
 	}
 	return time >= 0 && time <= MaximumTime && err == nil
 }
+
+// this is a no-op for btrdbv3
+func (bdb *btrIface) StreamExists(uuid common.UUID) (bool, error) {
+	return true, nil
+}
+
+// this is a no-op for btrdbv3
+func (bdb *btrIface) RegisterStream(uuid common.UUID, uri, name string) error {
+	return nil
+}

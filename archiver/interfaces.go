@@ -19,7 +19,15 @@ type MetadataStore interface {
 	URIFromUUID(uuid common.UUID) (string, error)
 }
 
+// Interface for timeseries database.
 type TimeseriesStore interface {
+	// returns true if the stream exists
+	StreamExists(uuid common.UUID) (bool, error)
+
+	// registers the stream with the timeseries database
+	RegisterStream(uuid common.UUID, uri, name string) error
+
+	// writes a set of readings for a particular stream
 	AddReadings(common.Timeseries) error
 
 	// list of UUIDs, reference time in nanoseconds
