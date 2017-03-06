@@ -96,10 +96,25 @@ func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name string) 
 	return
 }
 
-// TODO: Problem here is that if the stream does not exist at this point in time, then
-// we need to grab other components from the archive request in order to ensure that
-// the stream is created. Where's the best place to do this? Probably in the constructor
-// for the stream
+// given a list of UUIDs, returns those for which a stream object exists
+func (bdb *btrdbv4Iface) uuidsToStreams(uuids []common.UUID) []*btrdb.Stream {
+	var streams []*btrdb.Stream
+	// filter the list of uuids by those that are actually streams
+	for _, id := range uuids {
+		// grab the stream object from the cache
+		stream, err := bdb.getStream(id)
+		if err == nil {
+			streams = append(streams, stream)
+			continue
+		}
+		if err == errStreamNotExist {
+			continue // skip if no stream
+		}
+		log.Error(errors.Wrapf(err, "Could not find stream %s", id))
+	}
+	return streams
+}
+
 func (bdb *btrdbv4Iface) AddReadings(readings common.Timeseries) error {
 	// get the stream object from the cache
 	stream, err := bdb.getStream(readings.UUID)
@@ -123,21 +138,7 @@ func (bdb *btrdbv4Iface) AddReadings(readings common.Timeseries) error {
 // Need to filter that list of UUIDs by those that exist
 func (bdb *btrdbv4Iface) nearest(uuids []common.UUID, start uint64, backwards bool) ([]common.Timeseries, error) {
 	var results []common.Timeseries
-	var streams []*btrdb.Stream
-	// filter the list of uuids by those that are actually streams
-	for _, id := range uuids {
-		// grab the stream object from the cache
-		stream, err := bdb.getStream(id)
-		if err == nil {
-			streams = append(streams, stream)
-			continue
-		}
-		if err == errStreamNotExist {
-			continue // skip if no stream
-		}
-		log.Error(errors.Wrapf(err, "Could not find stream %s", id))
-	}
-
+	streams := bdb.uuidsToStreams(uuids)
 	for _, stream := range streams {
 		ctx := context.Background()
 		ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -146,7 +147,7 @@ func (bdb *btrdbv4Iface) nearest(uuids []common.UUID, start uint64, backwards bo
 		if err != nil {
 			return results, errors.Wrapf(err, "Could not get Nearest point for %s", stream.UUID())
 		}
-		reading := []*common.TimeseriesReading{&common.TimeseriesReading{Time: time.Unix(0, point.Time), Unit: common.UOT_NS, Value: point.Value}}
+		reading := []*common.TimeseriesReading{rawpointToTimeseriesReading(point)}
 		ts := common.Timeseries{
 			Records:    reading,
 			Generation: generation,
@@ -161,19 +162,119 @@ func (bdb *btrdbv4Iface) nearest(uuids []common.UUID, start uint64, backwards bo
 func (bdb *btrdbv4Iface) Prev(uuids []common.UUID, beforeTime uint64) ([]common.Timeseries, error) {
 	return bdb.nearest(uuids, beforeTime, true)
 }
+
 func (bdb *btrdbv4Iface) Next(uuids []common.UUID, afterTime uint64) ([]common.Timeseries, error) {
 	return bdb.nearest(uuids, afterTime, false)
 }
 
-//	// uuids, start time, end time (both in nanoseconds)
-//	GetData(uuids []common.UUID, start uint64, end uint64) ([]common.Timeseries, error)
-//
-//	// pointWidth is the log of the number of records to aggregate
-//	StatisticalData(uuids []common.UUID, pointWidth int, start, end uint64) ([]common.StatisticTimeseries, error)
-//
-//	// width in nanoseconds
-//	WindowData(uuids []common.UUID, width, start, end uint64) ([]common.StatisticTimeseries, error)
-//
+//func (s *Stream) RawValues(ctx context.Context, start int64, end int64, version uint64) (chan RawPoint, chan uint64, chan error)
+//RawValues reads raw values from BTrDB. The returned RawPoint channel must be fully consumed.
+func (bdb *btrdbv4Iface) GetData(uuids []common.UUID, start, end uint64) ([]common.Timeseries, error) {
+	var results []common.Timeseries
+	streams := bdb.uuidsToStreams(uuids)
+	for _, stream := range streams {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		ts := common.Timeseries{
+			UUID: common.ParseUUID(stream.UUID().String()),
+		}
+		rawpoints, generations, errchan := stream.RawValues(ctx, int64(start), int64(end), 0)
+		// remember: must consume all points
+		for point := range rawpoints {
+			ts.Records = append(ts.Records, rawpointToTimeseriesReading(point))
+		}
+		ts.Generation = <-generations
+		if err := <-errchan; err != nil {
+			return results, errors.Wrapf(err, "Could not fetch rawdata for stream %s", stream.UUID())
+		}
+
+		results = append(results, ts)
+	}
+	return results, nil
+}
+
+// AlignedWindows reads power-of-two aligned windows from BTrDB.
+// It is faster than Windows(). Each returned window will be 2^pointwidth nanoseconds long, starting at start.
+// Note that start is inclusive, but end is exclusive.
+// That is, results will be returned for all windows that start in the interval [start, end).
+// If end < start+2^pointwidth you will not get any results.
+// If start and end are not powers of two, the bottom pointwidth bits will be cleared.
+// Each window will contain statistical summaries of the window. Statistical points with count == 0 will be omitted.
+func (bdb *btrdbv4Iface) StatisticalData(uuids []common.UUID, pointWidth int, start, end uint64) ([]common.StatisticTimeseries, error) {
+	var results []common.StatisticTimeseries
+	streams := bdb.uuidsToStreams(uuids)
+	for _, stream := range streams {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		ts := common.StatisticTimeseries{
+			UUID: common.ParseUUID(stream.UUID().String()),
+		}
+		statpoints, generations, errchan := stream.AlignedWindows(ctx, int64(start), int64(end), uint8(pointWidth), 0)
+		// remember: must consume all points
+		for point := range statpoints {
+			ts.Records = append(ts.Records, statpointToStatisticsReading(point))
+		}
+		ts.Generation = <-generations
+		if err := <-errchan; err != nil {
+			return results, errors.Wrapf(err, "Could not fetch statdata for stream %s", stream.UUID())
+		}
+
+		results = append(results, ts)
+	}
+	return results, nil
+}
+
+// Windows returns arbitrary precision windows from BTrDB. It is slower than AlignedWindows, but still significantly faster than RawValues.
+// Each returned window will be width nanoseconds long. start is inclusive, but end is exclusive (e.g if end < start+width you will get no results).
+// That is, results will be returned for all windows that start at a time less than the end timestamp.
+// If (end - start) is not a multiple of width, then end will be decreased to the greatest value less than end such that (end - start) is a multiple of width
+// (i.e., we set end = start + width * floordiv(end - start, width).
+// The depth parameter is an optimization that can be used to speed up queries on fast queries.
+// Each window will be accurate to 2^depth nanoseconds. If depth is zero, the results are accurate to the nanosecond.
+// On a dense stream for large windows, this accuracy may not be required. For example for a window of a day, +- one second may be appropriate, so a depth of 30 can be specified.
+// This is much faster to execute on the database side. The StatPoint channel MUST be fully consumed.
+func (bdb *btrdbv4Iface) WindowData(uuids []common.UUID, width, start, end uint64) ([]common.StatisticTimeseries, error) {
+	var results []common.StatisticTimeseries
+	streams := bdb.uuidsToStreams(uuids)
+	for _, stream := range streams {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		ts := common.StatisticTimeseries{
+			UUID: common.ParseUUID(stream.UUID().String()),
+		}
+		statpoints, generations, errchan := stream.Windows(ctx, int64(start), int64(end), width, 0, 0)
+		// remember: must consume all points
+		for point := range statpoints {
+			ts.Records = append(ts.Records, statpointToStatisticsReading(point))
+		}
+		ts.Generation = <-generations
+		if err := <-errchan; err != nil {
+			return results, errors.Wrapf(err, "Could not fetch statdata for stream %s", stream.UUID())
+		}
+
+		results = append(results, ts)
+	}
+	return results, nil
+}
+
+// func (s *Stream) Changes(ctx context.Context, fromVersion uint64, toVersion uint64, resolution uint8) (crv chan ChangedRange, cver chan uint64, cerr chan error)
+func (bdb *btrdbv4Iface) ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64, resolution uint8) ([]common.ChangedRange, error) {
+	streams := bdb.uuidsToStreams(uuids)
+	for _, stream := range streams {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		changed, generations, errchan := stream.Changes(ctx, from_gen, to_gen, resolution)
+		for point := range changed {
+		}
+	}
+}
+
 //	// https://godoc.org/gopkg.in/btrdb.v3#BTrDBConnection.QueryChangedRanges
 //	ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64, resolution uint8) ([]common.ChangedRange, error)
 //
@@ -182,3 +283,10 @@ func (bdb *btrdbv4Iface) Next(uuids []common.UUID, afterTime uint64) ([]common.T
 //
 //	// returns true if the timestamp can be represented in the database
 //	ValidTimestamp(uint64, common.UnitOfTime) bool
+
+func rawpointToTimeseriesReading(point btrdb.RawPoint) *common.TimeseriesReading {
+	return &common.TimeseriesReading{Time: time.Unix(0, point.Time), Unit: common.UOT_NS, Value: point.Value}
+}
+func statpointToStatisticsReading(point btrdb.StatPoint) *common.StatisticsReading {
+	return &common.StatisticsReading{Time: time.Unix(0, point.Time), Unit: common.UOT_NS, Min: point.Min, Mean: point.Mean, Max: point.Max, Count: point.Count}
+}
