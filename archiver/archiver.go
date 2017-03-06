@@ -54,11 +54,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	}
 	a.MD = newMongoStore(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix})
 
-	btrdbaddr, err := net.ResolveTCPAddr("tcp4", c.BtrDB.Address)
-	if err != nil {
-		log.Fatal(errors.Wrapf(err, "Could not resolve BtrDB address %s", c.BtrDB.Address))
-	}
-	a.TS = newBtrIface(&btrdbConfig{address: btrdbaddr})
+	a.TS = newBTrDBv4(&btrdbv4Config{addresses: []string{c.BtrDB.Address}})
 
 	// setup bosswave
 	a.bw = bw2.ConnectOrExit(c.BOSSWAVE.Address)

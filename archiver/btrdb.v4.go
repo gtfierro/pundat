@@ -96,6 +96,22 @@ func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name string) 
 	return
 }
 
+func (bdb *btrdbv4Iface) RegisterStream(streamuuid common.UUID, uri, name string) error {
+	_, err := bdb.createStream(streamuuid, uri, name)
+	return err
+}
+
+func (bdb *btrdbv4Iface) StreamExists(streamuuid common.UUID) (bool, error) {
+	_, err := bdb.getStream(streamuuid)
+	if err == nil {
+		return true, nil
+	} else if err == errStreamNotExist {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
 // given a list of UUIDs, returns those for which a stream object exists
 func (bdb *btrdbv4Iface) uuidsToStreams(uuids []common.UUID) []*btrdb.Stream {
 	var streams []*btrdb.Stream
@@ -263,26 +279,48 @@ func (bdb *btrdbv4Iface) WindowData(uuids []common.UUID, width, start, end uint6
 
 // func (s *Stream) Changes(ctx context.Context, fromVersion uint64, toVersion uint64, resolution uint8) (crv chan ChangedRange, cver chan uint64, cerr chan error)
 func (bdb *btrdbv4Iface) ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64, resolution uint8) ([]common.ChangedRange, error) {
+	var results []common.ChangedRange
 	streams := bdb.uuidsToStreams(uuids)
 	for _, stream := range streams {
 		ctx := context.Background()
 		ctx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 
-		changed, generations, errchan := stream.Changes(ctx, from_gen, to_gen, resolution)
-		for point := range changed {
+		cr := common.ChangedRange{
+			UUID: common.ParseUUID(stream.UUID().String()),
 		}
+		changed, _, errchan := stream.Changes(ctx, from_gen, to_gen, resolution)
+		for point := range changed {
+			cr.Ranges = append(cr.Ranges, &common.TimeRange{Generation: point.Version, StartTime: point.Start, EndTime: point.End})
+		}
+		if err := <-errchan; err != nil {
+			return results, errors.Wrapf(err, "Could not fetch changed ranges for stream %s", stream.UUID())
+		}
+		results = append(results, cr)
 	}
+	return results, nil
 }
 
-//	// https://godoc.org/gopkg.in/btrdb.v3#BTrDBConnection.QueryChangedRanges
-//	ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64, resolution uint8) ([]common.ChangedRange, error)
-//
-//	// delete data
-//	DeleteData(uuids []common.UUID, start uint64, end uint64) error
-//
-//	// returns true if the timestamp can be represented in the database
-//	ValidTimestamp(uint64, common.UnitOfTime) bool
+func (bdb *btrdbv4Iface) DeleteData(uuids []common.UUID, start, end uint64) error {
+	streams := bdb.uuidsToStreams(uuids)
+	for _, stream := range streams {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		if _, err := stream.DeleteRange(ctx, int64(start), int64(end)); err != nil {
+			return errors.Wrapf(err, "Could not delete range for stream %s", stream.UUID())
+		}
+	}
+	return nil
+}
+
+func (bdb *btrdbv4Iface) ValidTimestamp(time uint64, uot common.UnitOfTime) bool {
+	var err error
+	if uot != common.UOT_NS {
+		time, err = common.ConvertTime(time, uot, common.UOT_NS)
+	}
+	return time >= 0 && time <= MaximumTime && err == nil
+}
 
 func rawpointToTimeseriesReading(point btrdb.RawPoint) *common.TimeseriesReading {
 	return &common.TimeseriesReading{Time: time.Unix(0, point.Time), Unit: common.UOT_NS, Value: point.Value}
