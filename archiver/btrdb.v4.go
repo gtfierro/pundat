@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"context"
+	"encoding/base64"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ func newBTrDBv4(c *btrdbv4Config) *btrdbv4Iface {
 		log.Fatalf("Could not connect to btrdbv4: %v", err)
 	}
 	b.conn = conn
+	log.Notice("Connected to BtrDB!")
 
 	return b
 }
@@ -87,8 +89,15 @@ func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name string) 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	stream, err = bdb.conn.Create(ctx, uuid.Parse(streamuuid.String()), uri, map[string]string{"name": name}, nil)
-	if err != nil {
+	// var collectionRegex = regexp.MustCompile(`^[a-z][a-z0-9_.]+$`)
+	// var tagKeysRegex = regexp.MustCompile(`^[a-z][a-z0-9_.]+$`)
+	// var annKeysRegex = tagKeysRegex
+	// var tagValsRegex = regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&*\(\)._ -]*$`)
+	collection := "bw2"
+	uri = base64.RawStdEncoding.EncodeToString([]byte(uri))
+
+	stream, err = bdb.conn.Create(ctx, uuid.Parse(streamuuid.String()), collection, map[string]string{"name": name, "uri": uri}, nil)
+	if err == nil {
 		bdb.streamCacheLock.Lock()
 		bdb.streamCache[streamuuid.String()] = stream
 		bdb.streamCacheLock.Unlock()
