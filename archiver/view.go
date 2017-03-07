@@ -6,11 +6,13 @@ import (
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/pkg/errors"
 	"strings"
+	"sync"
 )
 
 // takes care of handling/parsing archive requests
 type viewManager struct {
 	client   *bw2.BW2Client
+	bwcfg    BWConfig
 	store    MetadataStore
 	ts       TimeseriesStore
 	vk       string
@@ -18,20 +20,24 @@ type viewManager struct {
 	incoming chan *bw2.SimpleMessage
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
+	namespaceClients map[string]*bw2util.Client
+	namespaceLock    sync.Mutex
 	requestHosts     *SynchronizedArchiveRequestMap
 	requestURIs      *SynchronizedArchiveRequestMap
 	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client, vk string, store MetadataStore, ts TimeseriesStore, subber *metadatasubscriber) *viewManager {
+func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store MetadataStore, ts TimeseriesStore, subber *metadatasubscriber) *viewManager {
 	vm := &viewManager{
 		client:           client,
+		bwcfg:            cfg,
 		store:            store,
 		ts:               ts,
 		vk:               vk,
 		subber:           subber,
 		incoming:         make(chan *bw2.SimpleMessage, 100),
 		namespaceAliases: make(map[string]string),
+		namespaceClients: make(map[string]*bw2util.Client),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
 		requestURIs:      NewSynchronizedArchiveRequestMap(),
 		muxer:            NewSubscriberMultiplexer(client),
@@ -91,10 +97,16 @@ func newViewManager(client *bw2.BW2Client, vk string, store MetadataStore, ts Ti
 // Given a namespace, we subscribe to <ns>/*/!meta/giles. For each received message
 // on the URI, we extract the list of ArchiveRequests
 func (vm *viewManager) subscribeNamespace(ns string) {
+	vm.namespaceLock.Lock()
+	defer vm.namespaceLock.Unlock()
 	namespace := strings.TrimSuffix(ns, "/") + "/*/!meta/giles"
 	log.Noticef("Intend to subscribe to %s", namespace)
 
-	c2, err := bw2util.NewClient(vm.client, vm.vk)
+	client := bw2.ConnectOrExit(vm.bwcfg.Address)
+	client.OverrideAutoChainTo(true)
+	client.SetEntityFileOrExit(vm.bwcfg.Entityfile)
+
+	c2, err := bw2util.NewClient(client, vm.vk)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "Problem in creating new client"))
 	}
@@ -103,6 +115,14 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 		log.Fatal(errors.Wrap(err, "Problem in multi subscribe"))
 	}
 	log.Noticef("Subscribe to %s", namespace)
+	data, _, err := c2.ResolveLongAlias(ns)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	resolved_ns := bw2.ToBase64(data)
+	vm.namespaceAliases[ns] = resolved_ns
+	vm.namespaceClients[resolved_ns] = c2
 	//sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
 	//	URI: namespace,
 	//})
@@ -161,7 +181,17 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 			metadataURIs = append(metadataURIs, uri+"/!meta/+")
 		}
 	}
-	sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
+	var client *bw2util.Client
+	vm.namespaceLock.Lock()
+	ns := strings.Split(stream.uri, "/")[0]
+	if resolved, found := vm.namespaceAliases[ns]; found {
+		client = vm.namespaceClients[resolved]
+	} else {
+		client = vm.namespaceClients[ns]
+	}
+	vm.namespaceLock.Unlock()
+
+	sub, err := client.Subscribe(&bw2.SubscribeParams{
 		URI: stream.uri,
 	})
 	if err != nil {
