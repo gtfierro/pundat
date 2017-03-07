@@ -26,11 +26,18 @@ type BTRDBConfig struct {
 	Address string
 }
 
+type BenchmarkConfig struct {
+	EnableCPUProfile   bool
+	EnableMEMProfile   bool
+	EnableBlockProfile bool
+}
+
 type Config struct {
-	Archiver ARConfig
-	BOSSWAVE BWConfig
-	Metadata MDConfig
-	BtrDB    BTRDBConfig
+	Archiver  ARConfig
+	BOSSWAVE  BWConfig
+	Metadata  MDConfig
+	BtrDB     BTRDBConfig
+	Benchmark BenchmarkConfig
 }
 
 func LoadConfig(filename string) *Config {

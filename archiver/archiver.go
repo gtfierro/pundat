@@ -8,6 +8,7 @@ import (
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
+	"github.com/pkg/profile"
 	"net"
 	"os"
 	"time"
@@ -45,6 +46,14 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a = &Archiver{
 		config: c,
 		stop:   make(chan bool),
+	}
+	// enable profiling if configured
+	if c.Benchmark.EnableCPUProfile {
+		defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
+	} else if c.Benchmark.EnableMEMProfile {
+		defer profile.Start(profile.MemProfile, profile.ProfilePath(".")).Stop()
+	} else if c.Benchmark.EnableBlockProfile {
+		defer profile.Start(profile.BlockProfile, profile.ProfilePath(".")).Stop()
 	}
 
 	// setup metadata

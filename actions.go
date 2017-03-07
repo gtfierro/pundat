@@ -163,6 +163,11 @@ func makeConfig(c *cli.Context) error {
 	fmt.Fprintln(f, "")
 	fmt.Fprintln(f, "[BtrDB]")
 	fmt.Fprintln(f, "Address = 0.0.0.0:4410")
+	fmt.Fprintln(f, "")
+	fmt.Fprintln(f, "[Benchmark]")
+	fmt.Fprintln(f, "EnableCPUProfile = false")
+	fmt.Fprintln(f, "EnableMEMProfile = false")
+	fmt.Fprintln(f, "EnableBlockProfile = false")
 	return f.Sync()
 }
 
