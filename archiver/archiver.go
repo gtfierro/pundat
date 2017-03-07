@@ -72,13 +72,16 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.ms = newMetadataSubscriber(a.bw, a.MD)
 
 	// setup view manager
-	a.vm = newViewManager(a.bw, a.vk, a.MD, a.TS, a.ms)
+	a.vm = newViewManager(a.bw, a.vk, c.BOSSWAVE, a.MD, a.TS, a.ms)
 
 	a.qp = querylang.NewQueryProcessor()
 
-	a.svc = a.bw.RegisterService(c.BOSSWAVE.DeployNS, "s.giles")
+	queryClient := bw2.ConnectOrExit(c.BOSSWAVE.Address)
+	queryClient.OverrideAutoChainTo(true)
+	queryClient.SetEntityFileOrExit(c.BOSSWAVE.Entityfile)
+	a.svc = queryClient.RegisterService(c.BOSSWAVE.DeployNS, "s.giles")
 	a.iface = a.svc.RegisterInterface("_", "i.archiver")
-	queryChan, err := a.bw.Subscribe(&bw2.SubscribeParams{
+	queryChan, err := queryClient.Subscribe(&bw2.SubscribeParams{
 		URI: a.iface.SlotURI("query"),
 	})
 	if err != nil {

@@ -32,7 +32,8 @@ type mongoStore struct {
 	prefixRecords     *mgo.Collection
 	prefixRecordsLock sync.Mutex
 
-	uricache *ccache.Cache
+	uricache  *ccache.Cache
+	namecache *ccache.Cache
 
 	updatedPrefixes     map[string]struct{}
 	updatedPrefixesLock sync.Mutex
@@ -41,7 +42,8 @@ type mongoStore struct {
 func newMongoStore(c *mongoConfig) *mongoStore {
 	var err error
 	m := &mongoStore{
-		uricache:        ccache.New(ccache.Configure()),
+		uricache:        ccache.New(ccache.Configure().MaxSize(1000000)),
+		namecache:       ccache.New(ccache.Configure().MaxSize(1000000)),
 		updatedPrefixes: make(map[string]struct{}),
 	}
 	log.Noticef("Connecting to MongoDB at %v...", c.address.String())
@@ -146,10 +148,20 @@ func (m *mongoStore) addIndexes() {
 	if err != nil {
 		log.Fatalf("Could not create index on mapping.{uri,uuid} (%v)", err)
 	}
+	index.Key = []string{"uuid"}
+	err = m.mapping.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on mapping.uuid (%v)", err)
+	}
 	index.Key = []string{"path", "uuid"}
 	err = m.documents.EnsureIndex(index)
 	if err != nil {
 		log.Fatalf("Could not create index on documents.{uri,uuid} (%v)", err)
+	}
+	index.Key = []string{"uuid"}
+	err = m.documents.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on documents.uuid (%v)", err)
 	}
 	index.Key = []string{"__prefix"}
 	err = m.prefixRecords.EnsureIndex(index)
@@ -302,6 +314,9 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 }
 
 func (m *mongoStore) AddNameTag(name string, uuid common.UUID) error {
+	if m.namecache.Get(name+uuid.String()) != nil {
+		return nil
+	}
 	updateFilter := bson.M{
 		"uuid": uuid,
 	}
@@ -311,6 +326,7 @@ func (m *mongoStore) AddNameTag(name string, uuid common.UUID) error {
 	if err := m.documents.Update(updateFilter, updateContents); err != nil && !mgo.IsDup(err) {
 		return err
 	}
+	m.namecache.Set(name+uuid.String(), struct{}{}, 30*time.Minute)
 	return nil
 }
 
@@ -337,7 +353,7 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 		return errors.Wrap(err, "Could not insert uuid,uri new document")
 	}
 
-	m.uricache.Set(uri+uuid.String(), struct{}{}, 10*time.Minute)
+	m.uricache.Set(uri+uuid.String(), struct{}{}, 30*time.Minute)
 
 	return nil
 }
