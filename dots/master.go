@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"github.com/immesys/bw2/objects"
 	"github.com/immesys/bw2/util"
+	bw2 "github.com/immesys/bw2bind"
 	"github.com/karlseguin/ccache"
 	"github.com/pkg/errors"
-	bw2 "github.com/immesys/bw2bind"
 	"log"
 	"strings"
 	"time"
@@ -28,27 +28,37 @@ func unFmtHash(s string) []byte {
 }
 
 type DotMaster struct {
-	client *bw2.BW2Client
-	cache  *ccache.LayeredCache
-	expiry time.Duration
+	client  *bw2.BW2Client
+	cache   *ccache.LayeredCache
+	canread *ccache.Cache
+	expiry  time.Duration
 }
 
 func NewDotMaster(client *bw2.BW2Client, expiry time.Duration) *DotMaster {
 	return &DotMaster{
-		client: client,
-		cache:  ccache.Layered(ccache.Configure()),
-		expiry: expiry,
+		client:  client,
+		cache:   ccache.Layered(ccache.Configure().MaxSize(1000000)),
+		canread: ccache.New(ccache.Configure().MaxSize(1000000)),
+		expiry:  expiry,
 	}
 }
 
 // Returns nil if VK can read URI; else returns an error
 // really just a simple wrapper around buildanychain
 func (dm *DotMaster) CanRead(uri, vk string) error {
-	chain, err := dm.client.BuildAnyChain(uri, "C", vk)
-	if chain != nil && err == nil {
-		return nil
+	key := uri + vk
+	if item := dm.canread.Get(key); item == nil {
+		chain, err := dm.client.BuildAnyChain(uri, "C", vk)
+		dm.canread.Set(key, err == nil, 10*time.Minute)
+		if chain != nil && err == nil {
+			return nil
+		}
+		//cannot read
+		return errors.Wrap(err, "Could not build chain")
+	} else if item.Value().(bool) {
+		return nil // can read!
 	}
-	return errors.Wrap(err, "Could not build chain")
+	return errors.New("Could not build chain")
 }
 
 func (dm *DotMaster) GetValidRanges(uri, vk string) (*DisjointRanges, error) {
