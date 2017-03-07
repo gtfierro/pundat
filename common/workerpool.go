@@ -26,9 +26,7 @@ func NewWorkerPool(in chan *bw.SimpleMessage, cb func(msg *bw.SimpleMessage), si
 }
 
 func (pool *workerPool) Start() {
-	go func() {
-		for msg := range pool.in {
-			go pool.cb(msg)
-		}
-	}()
+	for i := 0; i < pool.size; i++ {
+		go worker(pool.in, pool.cb)
+	}
 }
