@@ -1,4 +1,4 @@
-//go:generate go tool yacc -o query.go -p sq query.y
+//go:generate goyacc -o query.go -p sq query.y
 package querylang
 
 import (

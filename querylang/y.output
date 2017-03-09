@@ -1207,14 +1207,14 @@ state 148
 
 
 42 terminals, 17 nonterminals
-53 grammar rules, 149/2000 states
+53 grammar rules, 149/8000 states
 0 shift/reduce, 0 reduce/reduce conflicts reported
 66 working sets used
-memory: parser 93/30000
+memory: parser 93/120000
 32 extra closures
 180 shift entries, 1 exceptions
 64 goto entries
 30 entries saved by goto default
-Optimizer space used: output 169/30000
+Optimizer space used: output 169/120000
 169 table entries, 0 zero
 maximum spread: 40, maximum offset: 147

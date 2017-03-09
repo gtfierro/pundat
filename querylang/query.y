@@ -293,7 +293,7 @@ limit		: /* empty */
 
 timeconv    : /* empty */
             {
-                $$ = common.UOT_MS
+                $$ = common.UOT_NS
             }
             | AS LVALUE
             {

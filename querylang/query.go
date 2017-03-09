@@ -1013,7 +1013,7 @@ sqdefault:
 		sqDollar = sqS[sqpt-0 : sqpt+1]
 		//line query.y:295
 		{
-			sqVAL.timeconv = common.UOT_MS
+			sqVAL.timeconv = common.UOT_NS
 		}
 	case 36:
 		sqDollar = sqS[sqpt-2 : sqpt+1]
