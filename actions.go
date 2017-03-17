@@ -562,6 +562,7 @@ func checkAccess(bwclient *bw2.BW2Client, key, uri string) (uris []string, hasPe
 		return
 	} else {
 		hasPermission[0] = true
+		fmt.Printf("Hash: %s  Permissions: %s%s URI: %s\n", chain.Hash, chain.Permissions, strings.Repeat(" ", 5-len(chain.Permissions)), chain.URI)
 	}
 
 	chain, err = bwclient.BuildAnyChain(queryURI, "P", key_vk)
@@ -574,6 +575,7 @@ func checkAccess(bwclient *bw2.BW2Client, key, uri string) (uris []string, hasPe
 		return
 	} else {
 		hasPermission[1] = true
+		fmt.Printf("Hash: %s  Permissions: %s%s URI: %s\n", chain.Hash, chain.Permissions, strings.Repeat(" ", 5-len(chain.Permissions)), chain.URI)
 	}
 
 	chain, err = bwclient.BuildAnyChain(responseURI, "C", key_vk)
@@ -586,6 +588,7 @@ func checkAccess(bwclient *bw2.BW2Client, key, uri string) (uris []string, hasPe
 		return
 	} else {
 		hasPermission[2] = true
+		fmt.Printf("Hash: %s  Permissions: %s%s URI: %s\n", chain.Hash, chain.Permissions, strings.Repeat(" ", 5-len(chain.Permissions)), chain.URI)
 	}
 
 	fmt.Println(successcolor(fmt.Sprintf("Key %s has access to archiver at %s\n", key_vk, uri)))
