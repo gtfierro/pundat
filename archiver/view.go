@@ -163,6 +163,7 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 		cancel:          make(chan bool),
 		valueString:     request.ValueExpr,
 		inheritMetadata: request.InheritMetadata,
+		buffer:          make(chan *bw2.SimpleMessage, 1000),
 	}
 
 	stream.valueExpr = ob.Parse(request.ValueExpr)

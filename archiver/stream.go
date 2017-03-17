@@ -35,6 +35,7 @@ type Stream struct {
 	// following fields used for operation of the stream
 	cancel       chan bool
 	subscription chan *bw2.SimpleMessage
+	buffer       chan *bw2.SimpleMessage
 }
 
 func (s *Stream) URI() string {
@@ -49,8 +50,13 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 	// dump into that channel, and then have a set of worker threads consume that. Need a way
 	// of scaling up/down the processing of that channel
 	go func() {
-		// for each message we receive
 		for msg := range s.subscription {
+			s.buffer <- msg
+		}
+	}()
+	go func() {
+		// for each message we receive
+		for msg := range s.buffer {
 			// for each payload object in the message
 			for _, po := range msg.POs {
 				// skip if its not the PO we expect
