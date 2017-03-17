@@ -474,7 +474,6 @@ func doGrant(c *cli.Context) error {
 	var wg sync.WaitGroup
 	wg.Add(len(dotsToPublish))
 	quit := make(chan bool)
-	var once sync.Once
 
 	for idx, blob := range dotsToPublish {
 		blob := blob
@@ -484,7 +483,6 @@ func doGrant(c *cli.Context) error {
 			log.Info("Publishing DOT", hash)
 			defer wg.Done()
 			a, err := datmoney.PublishDOT(blob)
-			once.Do(func() { quit <- true }) // quit the progress bar
 			if err != nil {
 				log.Error(errors.Wrap(err, fmt.Sprintf("Could not publish DOT with hash %s (%s)", hash, uri)))
 			} else {
@@ -505,6 +503,7 @@ func doGrant(c *cli.Context) error {
 		}
 	}()
 	wg.Wait()
+	quit <- true // quit the progress bar
 
 	return nil
 }
