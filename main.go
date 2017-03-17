@@ -21,8 +21,8 @@ func init() {
 func main() {
 	app := cli.NewApp()
 	app.Name = "pundat"
-	app.Usage = "An archiver for BOSSWAVE"
-	app.Version = "0.1"
+	app.Usage = "Archiver and data access tools for BOSSWAVE and BTrDB"
+	app.Version = "0.1.1"
 
 	app.Commands = []cli.Command{
 		{
