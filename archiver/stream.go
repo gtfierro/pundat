@@ -2,7 +2,6 @@ package archiver
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gtfierro/ob"
@@ -130,22 +129,8 @@ func (s *Stream) initialize(metadataStore MetadataStore, timeseriesStore Timeser
 
 //
 func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
-	// TODO: consider having a set of worker threads for handling subscriptions.
-	// If this is high-enough volume, then we may end up dropping some messages
-	// Maybe make a super large buffer channel (e.g. 10000 messages?) Have one goroutine
-	// dump into that channel, and then have a set of worker threads consume that. Need a way
-	// of scaling up/down the processing of that channel
-	var count int64 = 0
-	go func() {
-		for _ = range time.NewTicker(10 * time.Second).C {
-			if count > 0 {
-				log.Infof("stream %s has %d", s.uri, count)
-			}
-		}
-	}()
 	go func() {
 		for msg := range s.subscription {
-			atomic.AddInt64(&count, 1)
 			s.buffer <- msg
 		}
 	}()
@@ -254,8 +239,6 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 			s.Lock()
 			s.timeseries[msg.URI] = ts
 			s.Unlock()
-
-			atomic.AddInt64(&count, -1)
 		}
 	}()
 }
