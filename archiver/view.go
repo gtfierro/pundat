@@ -3,6 +3,7 @@ package archiver
 import (
 	"github.com/gtfierro/bw2util"
 	"github.com/gtfierro/ob"
+	"github.com/gtfierro/pundat/common"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/pkg/errors"
 	"strings"
@@ -163,7 +164,9 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 		cancel:          make(chan bool),
 		valueString:     request.ValueExpr,
 		inheritMetadata: request.InheritMetadata,
-		buffer:          make(chan *bw2.SimpleMessage, 1000),
+		buffer:          make(chan *bw2.SimpleMessage, 10000),
+		seenURIs:        make(map[string]common.UUID),
+		timeseries:      make(map[string]common.Timeseries),
 	}
 
 	stream.valueExpr = ob.Parse(request.ValueExpr)
