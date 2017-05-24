@@ -8,6 +8,7 @@ import (
 )
 
 var timeFormat = "2006-1-2 15:04:05.000000000 -0700 MST"
+var EMPTY_METADATA_RECORD = MetadataRecord{}
 
 // not associated with a UUID (pundat-specific). Needs
 // to be included in a MetadataGroup to make that association.
@@ -32,6 +33,20 @@ func RecordFromMessage(msg *bw2.SimpleMessage) *MetadataRecord {
 		}
 	}
 	return nil
+}
+
+func RecordFromMessageKey(msg *bw2.SimpleMessage) MetadataRecord {
+	po := msg.GetOnePODF(bw2.PODFSMetadata)
+	if _md, ok := po.(bw2.MetadataPayloadObject); ok {
+		md := _md.Value()
+		return MetadataRecord{
+			Key:       getURIKey(msg.URI),
+			Value:     md.Value,
+			SrcURI:    msg.URI,
+			TimeValid: time.Unix(0, md.Timestamp),
+		}
+	}
+	return EMPTY_METADATA_RECORD
 }
 
 func RecordFromBson(doc bson.M) *MetadataRecord {
