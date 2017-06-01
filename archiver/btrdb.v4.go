@@ -83,7 +83,7 @@ func (bdb *btrdbv4Iface) getStream(streamuuid common.UUID) (stream *btrdb.Stream
 // - a UUID (which we get from the archive request)
 // - a collection (which is the URI a message was published on)
 // - a set of tags (There will be one tag: name=request.Name)
-func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name string) (stream *btrdb.Stream, err error) {
+func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name, unit string) (stream *btrdb.Stream, err error) {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -94,7 +94,7 @@ func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name string) 
 	// var tagValsRegex = regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&*\(\)._ -]*$`)
 	collection := uri
 
-	stream, err = bdb.conn.Create(ctx, uuid.Parse(streamuuid.String()), collection, map[string]string{"name": name}, nil)
+	stream, err = bdb.conn.Create(ctx, uuid.Parse(streamuuid.String()), collection, map[string]string{"name": name, "unit": unit}, nil)
 	if err == nil {
 		bdb.streamCacheLock.Lock()
 		bdb.streamCache[streamuuid.String()] = stream
@@ -103,8 +103,8 @@ func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name string) 
 	return
 }
 
-func (bdb *btrdbv4Iface) RegisterStream(streamuuid common.UUID, uri, name string) error {
-	_, err := bdb.createStream(streamuuid, uri, name)
+func (bdb *btrdbv4Iface) RegisterStream(streamuuid common.UUID, uri, name, unit string) error {
+	_, err := bdb.createStream(streamuuid, uri, name, unit)
 	return err
 }
 

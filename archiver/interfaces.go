@@ -13,7 +13,6 @@ type MetadataStore interface {
 	AddNameTag(name string, uuid common.UUID) error
 
 	RemoveMetadata(VK string, tags []string, where common.Dict) error
-	URItoUUID(uri string) (common.UUID, error)
 	URIFromUUID(uuid common.UUID) (string, error)
 	InitializeURI(uri, rewrittenuri, name, unit string, uuid common.UUID) error
 }
@@ -24,7 +23,7 @@ type TimeseriesStore interface {
 	StreamExists(uuid common.UUID) (bool, error)
 
 	// registers the stream with the timeseries database
-	RegisterStream(uuid common.UUID, uri, name string) error
+	RegisterStream(uuid common.UUID, uri, name, unit string) error
 
 	// writes a set of readings for a particular stream
 	AddReadings(common.Timeseries) error

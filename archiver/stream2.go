@@ -2,6 +2,8 @@ package archiver
 
 import (
 	"regexp"
+	"sync"
+	"time"
 
 	"github.com/gtfierro/ob"
 	"github.com/gtfierro/pundat/common"
@@ -28,11 +30,20 @@ type Stream2 struct {
 	// maps URI -> UUID (under the other parameters of this archive request)
 	seenURIs   map[string]common.UUID
 	timeseries map[string]common.Timeseries
+	sync.RWMutex
 }
 
 func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore MetadataStore, msg *bw2.SimpleMessage) error {
 	currentUUID := common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, msg.URI+s.name).String())
+
+	// update stream structures
+	s.Lock()
 	s.seenURIs[msg.URI] = currentUUID
+	s.timeseries[msg.URI] = common.Timeseries{
+		UUID:   currentUUID,
+		SrcURI: msg.URI,
+	}
+	s.Unlock()
 
 	// don't need to worry about escaping $ in the URI because bosswave doesn't allow it
 	rewrittenURI := s.urimatch.ReplaceAllString(msg.URI, s.urireplace)
@@ -43,7 +54,40 @@ func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore Meta
 		return metadataErr
 	}
 
-	// TODO: do initialization with the timeseries store
+	if exists, err := timeseriesStore.StreamExists(currentUUID); err != nil {
+		log.Error(errors.Wrapf(err, "Could not check stream exists (%s)", currentUUID.String()))
+		return err
+	} else if !exists {
+		if err := timeseriesStore.RegisterStream(currentUUID, msg.URI, s.name, s.unit); err != nil {
+			log.Error(errors.Wrapf(err, "Could not create stream (%s %s %s %s)", currentUUID.String(), msg.URI, s.name, s.unit))
+			return err
+		}
+	}
+
+	// start go routine to push readings to the db
+	go func() {
+		for _ = range time.Tick(commitTick) {
+			s.RLock()
+			ts := s.timeseries[msg.URI]
+			s.RUnlock()
+			ts.Lock()
+			// if no readings, then we give up
+			if len(ts.Records) == 0 {
+				ts.Unlock()
+				continue
+			}
+			// now we can assume the stream exists and can write to it
+			if err := timeseriesStore.AddReadings(ts); err != nil {
+				log.Fatal(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
+			}
+			//atomic.AddInt64(&count, -1*len(ts.Records))
+			ts.Records = []*common.TimeseriesReading{}
+			ts.Unlock()
+			s.Lock()
+			s.timeseries[msg.URI] = ts
+			s.Unlock()
+		}
+	}()
 
 	return nil
 }
@@ -62,21 +106,113 @@ func (s *Stream2) start(timeseriesStore TimeseriesStore, metadataStore MetadataS
 			if len(msg.POs) == 0 {
 				continue
 			}
-			// get the UUID for the current message
-			var currentUUID common.UUID
-			var exists bool
 			// if we haven't seen this URI before, then we need to initialize it in order to get the UUID
-			if currentUUID, exists = s.seenURIs[msg.URI]; !exists {
+			if _, exists := s.seenURIs[msg.URI]; !exists {
 				// TODO: check error?
 				if err := s.initialize(timeseriesStore, metadataStore, msg); err != nil {
 					log.Error(err)
 					continue
 				}
-				currentUUID = s.seenURIs[msg.URI]
 			}
-			_ = currentUUID
-			//log.Debug(currentUUID)
+
+			// grab the timeseries object
+			s.RLock()
+			ts := s.timeseries[msg.URI]
+			s.RUnlock()
+			po := msg.GetOnePODF(s.po)
+
+			// unpack the message
+			//TODO: cannot assume msgpack
+			var thing interface{}
+			err := po.(bw2.MsgPackPayloadObject).ValueInto(&thing)
+			if err != nil {
+				log.Error(errors.Wrap(err, "Could not unmarshal msgpack object"))
+				continue
+			}
+
+			// extract the possible value
+			value := ob.Eval(s.valueExpr, thing)
+			if value == nil {
+				continue
+			}
+
+			// extract the time
+			timestamp := s.getTime(thing)
+
+			// generate the timeseries values from our extracted value, and then save it
+			// test if the value is a list
+			if value_list, ok := value.([]interface{}); ok {
+				for _, _val := range value_list {
+					value_f64, ok := _val.(float64)
+					if !ok {
+						if value_u64, ok := value.(uint64); ok {
+							value_f64 = float64(value_u64)
+						} else if value_i64, ok := value.(int64); ok {
+							value_f64 = float64(value_i64)
+						} else {
+							log.Errorf("Value %+v was not a float64 (was %T)", value, value)
+							continue
+						}
+					}
+					ts.Lock()
+					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
+					ts.Unlock()
+				}
+			} else {
+				value_f64, ok := value.(float64)
+				if !ok {
+					if value_u64, ok := value.(uint64); ok {
+						value_f64 = float64(value_u64)
+					} else if value_i64, ok := value.(int64); ok {
+						value_f64 = float64(value_i64)
+					} else {
+						log.Errorf("Value %+v was not a float64 (was %T)", value, value)
+						continue
+					}
+				}
+				ts.Lock()
+				ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
+				ts.Unlock()
+			}
+			ts.Lock()
+			if len(ts.Records) > commitCount {
+				// now we can assume the stream exists and can write to it
+				if err := timeseriesStore.AddReadings(ts); err != nil {
+					log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
+				}
+				ts.Records = []*common.TimeseriesReading{}
+			}
+			ts.Unlock()
+			s.Lock()
+			s.timeseries[msg.URI] = ts
+			s.Unlock()
 
 		}
 	}()
+}
+
+func (s *Stream2) getTime(thing interface{}) time.Time {
+	if len(s.timeExpr) == 0 {
+		return time.Now()
+	}
+	timeThing := ob.Eval(s.timeExpr, thing)
+	timeString, ok := timeThing.(string)
+	if ok {
+		parsedTime, err := time.Parse(s.timeParse, timeString)
+		if err != nil {
+			return time.Now()
+		}
+		return parsedTime
+	}
+
+	timeNum, ok := timeThing.(uint64)
+	if ok {
+		uot := common.GuessTimeUnit(timeNum)
+		i_ns, err := common.ConvertTime(timeNum, uot, common.UOT_NS)
+		if err != nil {
+			log.Error(err)
+		}
+		return time.Unix(0, int64(i_ns))
+	}
+	return time.Now()
 }

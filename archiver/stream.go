@@ -220,10 +220,10 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 				log.Error(errors.Wrapf(err, "Could not check stream exists (%s)", currentUUID.String()))
 				continue
 			} else if !exists {
-				if err := timeseriesStore.RegisterStream(currentUUID, msg.URI, s.name); err != nil {
-					log.Error(errors.Wrapf(err, "Could not create stream (%s %s %s)", currentUUID.String(), msg.URI, s.name))
-					continue
-				}
+				//if err := timeseriesStore.RegisterStream(currentUUID, msg.URI, s.name); err != nil {
+				//	log.Error(errors.Wrapf(err, "Could not create stream (%s %s %s)", currentUUID.String(), msg.URI, s.name))
+				//	continue
+				//}
 			}
 
 			ts.Lock()

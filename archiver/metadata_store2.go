@@ -15,6 +15,7 @@ type mongo_store2 struct {
 	session   *mgo.Session
 	db        *mgo.Database
 	documents *mgo.Collection
+	uuidtouri *mgo.Collection
 }
 
 func newMongoStore2(c *mongoConfig) *mongo_store2 {
@@ -31,6 +32,7 @@ func newMongoStore2(c *mongoConfig) *mongo_store2 {
 	log.Notice("...connected!")
 	m.db = m.session.DB(c.collectionPrefix + "_pundat")
 	m.documents = m.db.C("documents")
+	m.uuidtouri = m.db.C("uuidtouri")
 	// add indexes. This will fail Fatal
 	m.addIndexes()
 
@@ -148,11 +150,10 @@ func (m *mongo_store2) AddNameTag(name string, uuid common.UUID) error {
 func (m *mongo_store2) RemoveMetadata(VK string, tags []string, where common.Dict) error {
 	return nil
 }
-func (m *mongo_store2) URItoUUID(uri string) (common.UUID, error) {
-	return common.UUID{}, nil
-}
 func (m *mongo_store2) URIFromUUID(uuid common.UUID) (string, error) {
-	return "", nil
+	var uri interface{}
+	err := m.uuidtouri.Find(bson.M{"uuid": uuid.String()}).Select(bson.M{"uri": 1}).One(&uri)
+	return uri.(bson.M)["uri"].(string), err
 }
 
 func (m *mongo_store2) InitializeURI(uri, rewrittenURI, name, unit string, uuid common.UUID) error {
@@ -165,6 +166,9 @@ func (m *mongo_store2) InitializeURI(uri, rewrittenURI, name, unit string, uuid 
 	doc["uuid"] = uuid.String()
 
 	if _, insertErr := m.documents.Upsert(bson.M{"uuid": doc["uuid"]}, doc); insertErr != nil {
+		return insertErr
+	}
+	if _, insertErr := m.uuidtouri.Upsert(bson.M{"uuid": doc["uuid"]}, bson.M{"uuid": doc["uuid"], "uri": doc["uri"]}); insertErr != nil {
 		return insertErr
 	}
 
@@ -189,5 +193,13 @@ func (m *mongo_store2) addIndexes() {
 	err = m.documents.EnsureIndex(index)
 	if err != nil {
 		log.Fatalf("Could not create index on metadata.{uuid} (%v)", err)
+	}
+
+	index.Key = []string{"uri", "uuid"}
+	index.Unique = true
+	index.DropDups = true
+	err = m.uuidtouri.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on uuidtouri.{uri, uuid} (%v)", err)
 	}
 }
