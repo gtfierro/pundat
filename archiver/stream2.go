@@ -12,6 +12,10 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+var commitTick = 5 * time.Second
+var commitCount = 256
+var annotationTick = 5 * time.Minute
+
 type Stream2 struct {
 	// Archive request information
 	subscribeURI string
@@ -64,7 +68,7 @@ func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore Meta
 		}
 	}
 
-	// start go routine to push readings to the db
+	// start routine to push readings to the db
 	go func() {
 		for _ = range time.Tick(commitTick) {
 			s.RLock()
@@ -86,6 +90,26 @@ func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore Meta
 			s.Lock()
 			s.timeseries[msg.URI] = ts
 			s.Unlock()
+		}
+	}()
+
+	// start goroutine to push stream metadata into timeseries store
+	go func() {
+		for _ = range time.Tick(annotationTick) {
+			log.Infof("Updating stream annotations for %s", msg.URI)
+			var uuids []common.UUID
+			s.RLock()
+			for _, ts := range s.timeseries {
+				uuids = append(uuids, ts.UUID)
+			}
+			s.RUnlock()
+			for _, uuid := range uuids {
+				if doc := metadataStore.GetDocument(uuid); doc == nil {
+					continue
+				} else if err := timeseriesStore.AddAnnotations(uuid, doc); err != nil {
+					log.Error(err)
+				}
+			}
 		}
 	}()
 

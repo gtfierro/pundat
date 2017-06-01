@@ -77,8 +77,10 @@ func (req *ArchiveRequest) Dump() {
 		fmt.Printf("│├ Using server timestamps\n")
 	}
 	fmt.Println("│└")
-	fmt.Printf("├ URI Match: %s\n", req.URIMatch)
-	fmt.Printf("├ URI Replace: %s\n", req.URIReplace)
+	if len(req.URIMatch) > 0 || len(req.URIReplace) > 0 {
+		fmt.Printf("├ URI Match: %s\n", req.URIMatch)
+		fmt.Printf("├ URI Replace: %s\n", req.URIReplace)
+	}
 	fmt.Println("└────────────────")
 }
 

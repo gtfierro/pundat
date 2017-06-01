@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -334,4 +335,27 @@ func rawpointToTimeseriesReading(point btrdb.RawPoint) *common.TimeseriesReading
 }
 func statpointToStatisticsReading(point btrdb.StatPoint) *common.StatisticsReading {
 	return &common.StatisticsReading{Time: time.Unix(0, point.Time), Unit: common.UOT_NS, Min: point.Min, Mean: point.Mean, Max: point.Max, Count: point.Count}
+}
+
+func (bdb *btrdbv4Iface) AddAnnotations(uuid common.UUID, updates map[string]interface{}) error {
+	streams := bdb.uuidsToStreams([]common.UUID{uuid})
+	for _, stream := range streams {
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		var annotations = make(map[string]*string)
+		for k, v := range updates {
+			vs := v.(string)
+			k = strings.ToLower(k)
+			annotations[k] = &vs
+		}
+		_, ver, err := stream.Annotations(ctx)
+		if err != nil {
+			return err
+		}
+
+		return stream.CompareAndSetAnnotation(ctx, ver, annotations)
+		// only expect one
+	}
+	return nil
 }

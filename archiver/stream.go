@@ -11,9 +11,6 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-var commitTick = 5 * time.Second
-var commitCount = 256
-
 type Stream struct {
 	// timeseries identifier
 	//UUID     common.UUID
@@ -85,9 +82,9 @@ func (s *Stream) initialize(metadataStore MetadataStore, timeseriesStore Timeser
 	//}
 
 	log.Debug("INITIALIZE", msg.URI, s.name, currentUUID)
-	if err := metadataStore.AddNameTag(s.name, currentUUID); err != nil {
-		return err
-	}
+	//if err := metadataStore.AddNameTag(s.name, currentUUID); err != nil {
+	//	return err
+	//}
 
 	s.Lock()
 	// add to the local maps

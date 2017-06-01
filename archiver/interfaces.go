@@ -2,6 +2,8 @@ package archiver
 
 import (
 	"github.com/gtfierro/pundat/common"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 type MetadataStore interface {
@@ -10,10 +12,9 @@ type MetadataStore interface {
 	GetDistinct(VK string, tag string, where common.Dict) ([]string, error)
 	GetUUIDs(VK string, where common.Dict) ([]common.UUID, error)
 
-	AddNameTag(name string, uuid common.UUID) error
-
-	RemoveMetadata(VK string, tags []string, where common.Dict) error
 	URIFromUUID(uuid common.UUID) (string, error)
+	UUIDFromURI(uri string) (common.UUID, error)
+	GetDocument(uuid common.UUID) bson.M
 	InitializeURI(uri, rewrittenuri, name, unit string, uuid common.UUID) error
 }
 
@@ -53,4 +54,6 @@ type TimeseriesStore interface {
 
 	// returns true if the timestamp can be represented in the database
 	ValidTimestamp(uint64, common.UnitOfTime) bool
+
+	AddAnnotations(uuid common.UUID, annotations map[string]interface{}) error
 }
