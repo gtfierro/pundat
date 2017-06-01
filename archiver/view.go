@@ -1,13 +1,15 @@
 package archiver
 
 import (
+	"regexp"
+	"strings"
+	"sync"
+
 	"github.com/gtfierro/bw2util"
 	"github.com/gtfierro/ob"
 	"github.com/gtfierro/pundat/common"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/pkg/errors"
-	"strings"
-	"sync"
 )
 
 // takes care of handling/parsing archive requests
@@ -17,7 +19,6 @@ type viewManager struct {
 	store    MetadataStore
 	ts       TimeseriesStore
 	vk       string
-	subber   *metadatasubscriber
 	incoming chan *bw2.SimpleMessage
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
@@ -25,29 +26,26 @@ type viewManager struct {
 	namespaceLock    sync.Mutex
 	requestHosts     *SynchronizedArchiveRequestMap
 	requestURIs      *SynchronizedArchiveRequestMap
-	muxer            *SubscriberMultiplexer
 }
 
-func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store MetadataStore, ts TimeseriesStore, subber *metadatasubscriber) *viewManager {
+func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store MetadataStore, ts TimeseriesStore) *viewManager {
 	vm := &viewManager{
 		client:           client,
 		bwcfg:            cfg,
 		store:            store,
 		ts:               ts,
 		vk:               vk,
-		subber:           subber,
 		incoming:         make(chan *bw2.SimpleMessage, 100),
 		namespaceAliases: make(map[string]string),
 		namespaceClients: make(map[string]*bw2util.Client),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
 		requestURIs:      NewSynchronizedArchiveRequestMap(),
-		muxer:            NewSubscriberMultiplexer(client),
 	}
 	go func() {
 		for msg := range vm.incoming {
 			parts := strings.Split(msg.URI, "/")
 			key := parts[len(parts)-1]
-			if key != "giles" {
+			if key != "archiverequest" {
 				continue
 			}
 			var requests []*ArchiveRequest
@@ -62,22 +60,23 @@ func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store Metada
 					log.Error(errors.Wrap(err, "Could not parse Archive Request"))
 					continue
 				}
-				if request.PO == 0 {
+				if len(request.PO) == 0 {
 					log.Error("Request contained no PO")
 					continue
 				}
 				if len(request.Name) == 0 {
 					log.Error("Request contained no Name")
+					continue
 				}
-				if request.ValueExpr == "" {
+				if len(request.ValueExpr) == 0 {
 					log.Error("Request contained no Value expression")
 					continue
 				}
-				request.FromVK = msg.From
-				if request.URI == "" { // no URI supplied
-					request.URI = strings.TrimSuffix(request.URI, "!meta/giles")
-					request.URI = strings.TrimSuffix(request.URI, "/")
+				if len(request.URI) == 0 {
+					log.Error("Request contained no URI")
+					continue
 				}
+				request.FromVK = msg.From
 				chain, err := vm.client.BuildAnyChain(request.URI, "C", request.FromVK)
 				if err != nil || chain == nil {
 					log.Error(errors.Wrapf(err, "VK %s did not have permission to archive %s", request.FromVK, request.URI))
@@ -95,12 +94,12 @@ func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store Metada
 	return vm
 }
 
-// Given a namespace, we subscribe to <ns>/*/!meta/giles. For each received message
+// Given a namespace, we subscribe to <ns>/*/!meta/archiverequest. For each received message
 // on the URI, we extract the list of ArchiveRequests
 func (vm *viewManager) subscribeNamespace(ns string) {
 	vm.namespaceLock.Lock()
 	defer vm.namespaceLock.Unlock()
-	namespace := strings.TrimSuffix(ns, "/") + "/*/!meta/giles"
+	namespace := strings.TrimSuffix(ns, "/") + "/*/!meta/archiverequest"
 	log.Noticef("Intend to subscribe to %s", namespace)
 
 	client := bw2.ConnectOrExit(vm.bwcfg.Address)
@@ -111,7 +110,7 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "Problem in creating new client"))
 	}
-	inp, err := c2.MultiSubscribe(ns + "/*/!meta/giles")
+	inp, err := c2.MultiSubscribe(ns + "/*/!meta/archiverequest")
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "Problem in multi subscribe"))
 	}
@@ -124,26 +123,6 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 	resolved_ns := bw2.ToBase64(data)
 	vm.namespaceAliases[ns] = resolved_ns
 	vm.namespaceClients[resolved_ns] = c2
-	//sub, err := vm.client.Subscribe(&bw2.SubscribeParams{
-	//	URI: namespace,
-	//})
-	//if err != nil {
-	//	log.Fatal(errors.Wrapf(err, "Could not subscribe to namespace %s", namespace))
-	//}
-
-	//go func() {
-	//	for msg := range sub {
-	//		vm.incoming <- msg
-	//	}
-	//}()
-
-	//// handle archive requests that have already existed
-	//query, err := vm.client.Query(&bw2.QueryParams{
-	//	URI: namespace,
-	//})
-	//if err != nil {
-	//	log.Error(errors.Wrap(err, "Could not subscribe"))
-	//}
 	go func() {
 		for msg := range inp {
 			vm.incoming <- msg
@@ -157,37 +136,28 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 		return errors.New("VK was empty in ArchiveRequest")
 	}
 
-	// a Stream's URI is its subscription for timeseries data
-	stream := &Stream{
-		uri:             request.URI,
-		name:            request.Name,
-		cancel:          make(chan bool),
-		valueString:     request.ValueExpr,
-		inheritMetadata: request.InheritMetadata,
-		buffer:          make(chan *bw2.SimpleMessage, 10000),
-		seenURIs:        make(map[string]common.UUID),
-		timeseries:      make(map[string]common.Timeseries),
-	}
-
-	stream.valueExpr = ob.Parse(request.ValueExpr)
-
-	if len(request.UUIDExpr) > 0 {
-		stream.uuidExpr = ob.Parse(request.UUIDExpr)
-	}
-
+	s2 := &Stream2{}
+	s2.buffer = make(chan *bw2.SimpleMessage, 10000)
+	s2.seenURIs = make(map[string]common.UUID)
+	s2.timeseries = make(map[string]common.Timeseries)
+	s2.subscribeURI = request.URI
+	s2.name = request.Name
+	s2.unit = request.Unit
+	s2.po = request.PO
+	s2.valueExpr = ob.Parse(request.ValueExpr)
 	if len(request.TimeExpr) > 0 {
-		stream.timeExpr = ob.Parse(request.TimeExpr)
+		s2.timeExpr = ob.Parse(request.TimeExpr)
 	}
-
-	var metadataURIs []string
-	if request.InheritMetadata {
-		for _, uri := range GetURIPrefixes(request.URI) {
-			metadataURIs = append(metadataURIs, uri+"/!meta/+")
-		}
+	s2.timeParse = request.TimeParse
+	re, err := regexp.Compile(request.URIMatch)
+	if err != nil {
+		return err
 	}
+	s2.urimatch = re
+	s2.urireplace = request.URIReplace
 	var client *bw2util.Client
 	vm.namespaceLock.Lock()
-	ns := strings.Split(stream.uri, "/")[0]
+	ns := strings.Split(s2.subscribeURI, "/")[0]
 	if resolved, found := vm.namespaceAliases[ns]; found {
 		client = vm.namespaceClients[resolved]
 	} else {
@@ -196,23 +166,64 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	vm.namespaceLock.Unlock()
 
 	sub, err := client.Subscribe(&bw2.SubscribeParams{
-		URI: stream.uri,
+		URI: s2.subscribeURI,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "Could not subscribe to %s", stream.uri)
+		return errors.Wrapf(err, "Could not subscribe to %s", s2.subscribeURI)
 	}
-	stream.subscription = sub
-
-	for _, muri := range metadataURIs {
-		vm.subber.requestSubscription(muri)
-	}
+	s2.subscription = sub
 
 	// indicate that we've gotten an archive request
 	request.Dump()
 
 	// now, we save the stream
-	stream.startArchiving(vm.ts, vm.store)
+	s2.start(vm.ts, vm.store)
 
+	//	// a Stream's URI is its subscription for timeseries data
+	//	stream := &Stream{
+	//		uri:         request.URI,
+	//		name:        request.Name,
+	//		cancel:      make(chan bool),
+	//		valueString: request.ValueExpr,
+	//		buffer:      make(chan *bw2.SimpleMessage, 10000),
+	//		seenURIs:    make(map[string]common.UUID),
+	//		timeseries:  make(map[string]common.Timeseries),
+	//	}
+	//
+	//	stream.valueExpr = ob.Parse(request.ValueExpr)
+	//
+	//	if len(request.UUIDExpr) > 0 {
+	//		stream.uuidExpr = ob.Parse(request.UUIDExpr)
+	//	}
+	//
+	//	if len(request.TimeExpr) > 0 {
+	//		stream.timeExpr = ob.Parse(request.TimeExpr)
+	//	}
+	//
+	//	var client *bw2util.Client
+	//	vm.namespaceLock.Lock()
+	//	ns := strings.Split(stream.uri, "/")[0]
+	//	if resolved, found := vm.namespaceAliases[ns]; found {
+	//		client = vm.namespaceClients[resolved]
+	//	} else {
+	//		client = vm.namespaceClients[ns]
+	//	}
+	//	vm.namespaceLock.Unlock()
+	//
+	//	sub, err := client.Subscribe(&bw2.SubscribeParams{
+	//		URI: stream.uri,
+	//	})
+	//	if err != nil {
+	//		return errors.Wrapf(err, "Could not subscribe to %s", stream.uri)
+	//	}
+	//	stream.subscription = sub
+	//
+	//	// indicate that we've gotten an archive request
+	//	request.Dump()
+	//
+	//	// now, we save the stream
+	//	stream.startArchiving(vm.ts, vm.store)
+	//
 	return nil
 }
 

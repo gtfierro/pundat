@@ -1,5 +1,5 @@
 //go:generate msgp
-package main
+package scraper
 
 import (
 	"sync"

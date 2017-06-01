@@ -10,13 +10,12 @@ type MetadataStore interface {
 	GetDistinct(VK string, tag string, where common.Dict) ([]string, error)
 	GetUUIDs(VK string, where common.Dict) ([]common.UUID, error)
 
-	SaveMetadata(records []*common.MetadataRecord) error
 	AddNameTag(name string, uuid common.UUID) error
 
 	RemoveMetadata(VK string, tags []string, where common.Dict) error
-	MapURItoUUID(uri string, uuid common.UUID) error
 	URItoUUID(uri string) (common.UUID, error)
 	URIFromUUID(uuid common.UUID) (string, error)
+	InitializeURI(uri, rewrittenuri, name, unit string, uuid common.UUID) error
 }
 
 // Interface for timeseries database.

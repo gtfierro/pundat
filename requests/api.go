@@ -17,13 +17,15 @@ type ArchiveRequest messages.ArchiveRequest
 func (req *ArchiveRequest) SameAs(other *ArchiveRequest) bool {
 	return (req != nil && other != nil) &&
 		(req.URI == other.URI) &&
+		(req.Name == other.Name) &&
+		(req.Unit == other.Unit) &&
 		(req.PO == other.PO) &&
 		(req.UUIDExpr == other.UUIDExpr) &&
 		(req.ValueExpr == other.ValueExpr) &&
 		(req.TimeExpr == other.TimeExpr) &&
 		(req.TimeParse == other.TimeParse) &&
-		(req.Name == other.Name) &&
-		(req.InheritMetadata == other.InheritMetadata)
+		(req.URIMatch == other.URIMatch) &&
+		(req.URIReplace == other.URIReplace)
 }
 
 // checks URI and Name
@@ -42,11 +44,11 @@ func (req *ArchiveRequest) GetPO() (bw2.PayloadObject, error) {
 }
 
 // Returns the set of ArchiveRequest objects at all points in the URI. This method
-// attaches the `/!meta/giles` suffix to the provided URI pattern, so this also works
+// attaches the `/!meta/archiverequest` suffix to the provided URI pattern, so this also works
 // with `+` and `*` in the URI if your permissions allow.
 func GetArchiveRequests(client *bw2.BW2Client, uri string) ([]*ArchiveRequest, error) {
 	// generate the query URI
-	uri = addGilesSuffix(uri)
+	uri = addRequestSuffix(uri)
 	fmt.Printf("RETRIEVING from %s\n", uri)
 	queryResults, err := client.Query(&bw2.QueryParams{
 		URI:       uri,
@@ -73,7 +75,7 @@ func GetArchiveRequests(client *bw2.BW2Client, uri string) ([]*ArchiveRequest, e
 }
 
 func RemoveAllArchiveRequests(client *bw2.BW2Client, uri string) error {
-	uriFull := addGilesSuffix(uri)
+	uriFull := addRequestSuffix(uri)
 	fmt.Printf("DELETING ALL on %s\n", uriFull)
 	// delete all
 	return client.Publish(&bw2.PublishParams{
@@ -104,7 +106,7 @@ func RemoveArchiveRequestList(client *bw2.BW2Client, removeRequests ...*ArchiveR
 	for _, rem := range removeRequests {
 		rem.AttachURI = normalizeNamespace(client, rem.AttachURI)
 		scanuris[rem.AttachURI] = struct{}{}
-		rem.AttachURI = addGilesSuffix(rem.AttachURI)
+		rem.AttachURI = addRequestSuffix(rem.AttachURI)
 	}
 
 	// for each uri, get the list of archive requests. We filter this by those that we want
@@ -155,7 +157,7 @@ func AttachArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) e
 	var toadd = make(map[string][]*ArchiveRequest)
 	// sanity check the parameters
 	for _, request := range requests {
-		if request.PO == 0 {
+		if request.PO == "" {
 			return errors.New("Need a valid PO number")
 		}
 		if request.ValueExpr == "" {
@@ -164,7 +166,7 @@ func AttachArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) e
 		if request.Name == "" {
 			return errors.New("Need a Name")
 		}
-		request.AttachURI = normalizeNamespace(client, addGilesSuffix(request.AttachURI))
+		request.AttachURI = normalizeNamespace(client, addRequestSuffix(request.AttachURI))
 		toadd[request.AttachURI] = append(toadd[request.AttachURI], request)
 	}
 	for uri, requests := range toadd {
@@ -199,7 +201,7 @@ func AttachArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) e
 func MergeArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) error {
 	// sanity check the parameters
 	for _, request := range requests {
-		if request.PO == 0 {
+		if request.PO == "" {
 			return errors.New("Need a valid PO number")
 		}
 		if request.ValueExpr == "" {
@@ -208,7 +210,7 @@ func MergeArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) er
 		if request.Name == "" {
 			return errors.New("Need a Name")
 		}
-		request.AttachURI = normalizeNamespace(client, addGilesSuffix(request.AttachURI))
+		request.AttachURI = normalizeNamespace(client, addRequestSuffix(request.AttachURI))
 	}
 
 requestLoop:
@@ -275,10 +277,10 @@ func compareStringSliceAsSet(s1, s2 []string) bool {
 	return true
 }
 
-// if the string does not end with /!meta/giles, it adds it
-func addGilesSuffix(uri string) string {
-	if !strings.HasSuffix(uri, "/!meta/giles") {
-		return strings.TrimSuffix(uri, "/") + "/!meta/giles"
+// if the string does not end with /!meta/archiverequest, it adds it
+func addRequestSuffix(uri string) string {
+	if !strings.HasSuffix(uri, "/!meta/archiverequest") {
+		return strings.TrimSuffix(uri, "/") + "/!meta/archiverequest"
 	}
 	return uri
 }

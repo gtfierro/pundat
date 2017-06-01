@@ -2,7 +2,6 @@ package requests
 
 import (
 	"fmt"
-	bw2 "github.com/immesys/bw2bind"
 	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -26,32 +25,32 @@ type Config struct {
 }
 
 type DummyArchiveRequest struct {
-	AttachURI       string `yaml:"AttachURI"`
-	ArchiveURI      string `yaml:"ArchiveURI"`
-	PO              string `yaml:"PO"`
-	UUIDExpr        string `yaml:"UUID"`
-	ValueExpr       string `yaml:"Value"`
-	TimeExpr        string `yaml:"Time"`
-	TimeParse       string `yaml:"TimeParse"`
-	Name            string `yaml:"Name"`
-	InheritMetadata string `yaml:"InheritMetadata",omitempty`
+	AttachURI  string `yaml:"AttachURI"`
+	ArchiveURI string `yaml:"ArchiveURI"`
+	PO         string `yaml:"PO"`
+	UUIDExpr   string `yaml:"UUID"`
+	ValueExpr  string `yaml:"Value"`
+	TimeExpr   string `yaml:"Time"`
+	TimeParse  string `yaml:"TimeParse"`
+	URIMatch   string `yaml:"URIMatch"`
+	URIReplace string `yaml:"URIReplace"`
+	Name       string `yaml:"Name"`
+	Unit       string `yaml:"Unit"`
 }
 
 func (d DummyArchiveRequest) ToArchiveRequest() *ArchiveRequest {
-	var doinherit = true
-	if d.InheritMetadata == "false" {
-		doinherit = false
-	}
 	req := &ArchiveRequest{
-		URI:             d.ArchiveURI,
-		AttachURI:       d.AttachURI,
-		PO:              bw2.FromDotForm(d.PO),
-		UUIDExpr:        d.UUIDExpr,
-		ValueExpr:       d.ValueExpr,
-		TimeExpr:        d.TimeExpr,
-		TimeParse:       d.TimeParse,
-		Name:            d.Name,
-		InheritMetadata: doinherit,
+		URI:        d.ArchiveURI,
+		AttachURI:  d.AttachURI,
+		PO:         d.PO,
+		UUIDExpr:   d.UUIDExpr,
+		ValueExpr:  d.ValueExpr,
+		TimeExpr:   d.TimeExpr,
+		TimeParse:  d.TimeParse,
+		URIMatch:   d.URIMatch,
+		URIReplace: d.URIReplace,
+		Name:       d.Name,
+		Unit:       d.Unit,
 	}
 
 	if d.AttachURI == "" {

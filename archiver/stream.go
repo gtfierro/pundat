@@ -23,8 +23,7 @@ type Stream struct {
 	uri  string
 	name string
 	// list of Metadata URIs
-	metadataURIs    []string
-	inheritMetadata bool
+	metadataURIs []string
 
 	// following fields used for parsing received messages
 	// the type of PO to extract
@@ -40,8 +39,7 @@ type Stream struct {
 	cancel       chan bool
 	subscription chan *bw2.SimpleMessage
 	buffer       chan *bw2.SimpleMessage
-	// maps URI -> UUID (under the other parameters of this
-	// archive request)
+	// maps URI -> UUID (under the other parameters of this archive request)
 	seenURIs   map[string]common.UUID
 	timeseries map[string]common.Timeseries
 	sync.RWMutex
@@ -82,10 +80,11 @@ func (s *Stream) initialize(metadataStore MetadataStore, timeseriesStore Timeser
 	//	When I get a new UUID, with a URI, I need to find all of the Metadata rcords
 	//	in the MD database that are prefixes of this URI (w/o !meta suffix) and add
 	//	those associations in when we need to
-	if err := metadataStore.MapURItoUUID(msg.URI, currentUUID); err != nil {
-		return err
-	}
+	//if err := metadataStore.MapURItoUUID(msg.URI, currentUUID); err != nil {
+	//	return err
+	//}
 
+	log.Debug("INITIALIZE", msg.URI, s.name, currentUUID)
 	if err := metadataStore.AddNameTag(s.name, currentUUID); err != nil {
 		return err
 	}

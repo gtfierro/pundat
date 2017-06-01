@@ -84,7 +84,7 @@ type MetadataGroup struct {
 	Records map[string]*MetadataRecord
 	// stream UUID
 	UUID UUID
-	Path string
+	URI  string
 }
 
 func NewMetadataGroup(records ...*MetadataRecord) *MetadataGroup {
@@ -128,9 +128,9 @@ func GroupFromBson(doc bson.M) *MetadataGroup {
 		grp.UUID = ParseUUID(uuid.(string))
 		delete(doc, "uuid")
 	}
-	if path, found := doc["path"]; found {
-		grp.Path = path.(string)
-		delete(doc, "path")
+	if uri, found := doc["originaluri"]; found {
+		grp.URI = uri.(string)
+		delete(doc, "originaluri")
 	}
 	for key, value := range doc {
 		rec := &MetadataRecord{

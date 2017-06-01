@@ -1,8 +1,6 @@
-package main
+package scraper
 
 import (
-	"bufio"
-	"fmt"
 	"os"
 	"time"
 
@@ -10,26 +8,33 @@ import (
 	"github.com/gtfierro/pundat/common"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/op/go-logging"
+	//ldbutil "github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // logger
 var log *logging.Logger
 
-var DB = NewPrefixDB(&Config{
-	path: "pfx-leveldb",
-})
+var DB *PrefixDB
 
-// set up logging facilities
 func init() {
+	// set up logging facilities
 	log = logging.MustGetLogger("scraper")
 	var format = "%{color}%{level} %{shortfile} %{time:Jan 02 15:04:05} %{color:reset} ▶ %{message}"
 	var logBackend = logging.NewLogBackend(os.Stderr, "", 0)
 	logBackendLeveled := logging.AddModuleLevel(logBackend)
 	logging.SetBackend(logBackendLeveled)
 	logging.SetFormatter(logging.MustStringFormatter(format))
+
 }
 
-type listener struct {
+func Init() {
+	// initialize the database
+	DB = NewPrefixDB(&Config{
+		path: "pfx-leveldb",
+	})
+}
+
+type Listener struct {
 	// initialization
 	Client    *bw2util.Client
 	Namespace string
@@ -40,10 +45,11 @@ type listener struct {
 	subscribeURI string
 }
 
-func (l *listener) init() {
+func (l *Listener) Init() {
 	l.msgBuffer = make(chan *bw2.SimpleMessage)
 	// build metadata subscription uri
 	l.subscribeURI = l.Namespace + "/*/!meta/+"
+	log.Notice("Subscribing to metadata", l.subscribeURI)
 
 	var (
 		subc     chan *bw2.SimpleMessage
@@ -53,9 +59,8 @@ func (l *listener) init() {
 	)
 	// subscribe to the namespace
 	for {
-		subc, subErr = l.Client.Subscribe(&bw2.SubscribeParams{
-			URI: l.subscribeURI,
-		})
+		log.Notice("Initializing subscription to", l.subscribeURI)
+		subc, subErr = l.Client.MultiSubscribe(l.subscribeURI)
 		if subErr != nil {
 			log.Error(subErr)
 			time.Sleep(30 * time.Second) // retry in 30 seconds
@@ -65,6 +70,7 @@ func (l *listener) init() {
 
 	// query the namespace to get persisted messages
 	for {
+		log.Notice("Initializing query to", l.subscribeURI)
 		queryc, queryErr = l.Client.Query(&bw2.QueryParams{
 			URI: l.subscribeURI,
 		})
@@ -95,7 +101,7 @@ func (l *listener) init() {
 	return
 }
 
-func (l *listener) startWorker() {
+func (l *Listener) startWorker() {
 	for msg := range l.msgBuffer {
 		//uri := msg.URI
 		mdobj := common.RecordFromMessageKey(msg)
@@ -110,31 +116,31 @@ func (l *listener) startWorker() {
 	}
 }
 
-func main() {
-	_client := bw2.ConnectOrExit("")
-	_client.OverrideAutoChainTo(true)
-	vk := _client.SetEntityFromEnvironOrExit()
-
-	client, err := bw2util.NewClient(_client, vk)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	namespaces := []string{"ucberkeley/eecs/sdh"}
-
-	for _, ns := range namespaces {
-		l := &listener{
-			Client:    client,
-			Namespace: ns,
-		}
-		l.init()
-	}
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("URI: ")
-		text, _ := reader.ReadString('\n')
-		for key, val := range DB.Lookup(text) {
-			fmt.Println(">", key, "=", val)
-		}
-	}
-}
+//func main() {
+//	_client := bw2.ConnectOrExit("")
+//	_client.OverrideAutoChainTo(true)
+//	vk := _client.SetEntityFromEnvironOrExit()
+//
+//	client, err := bw2util.NewClient(_client, vk)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	namespaces := []string{"ucberkeley", "ciee", "amplab", "scratch.ns"}
+//
+//	for _, ns := range namespaces {
+//		l := &listener{
+//			Client:    client,
+//			Namespace: ns,
+//		}
+//		go l.init()
+//	}
+//	reader := bufio.NewReader(os.Stdin)
+//	for {
+//		fmt.Print("URI: ")
+//		text, _ := reader.ReadString('\n')
+//		for key, val := range DB.Lookup(text) {
+//			fmt.Println(">", key, "=", val)
+//		}
+//	}
+//}

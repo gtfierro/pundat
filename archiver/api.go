@@ -256,14 +256,14 @@ func (a *Archiver) maskMetadataGroupsByPermission(vk string, metadata []common.M
 	)
 	for _, group := range metadata {
 		// need to resolve path
-		if group.Path == "" {
+		if group.URI == "" {
 			uri, err := a.MD.URIFromUUID(group.UUID)
 			if err != nil {
 				return ret, err
 			}
-			group.Path = uri
+			group.URI = uri
 		}
-		if err := a.dotmaster.CanRead(group.Path, vk); err != nil {
+		if err := a.dotmaster.CanRead(group.URI, vk); err != nil {
 			continue
 		}
 		ret = append(ret, group)

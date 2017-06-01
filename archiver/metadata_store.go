@@ -34,17 +34,13 @@ type mongoStore struct {
 
 	uricache  *ccache.Cache
 	namecache *ccache.Cache
-
-	updatedPrefixes     map[string]struct{}
-	updatedPrefixesLock sync.Mutex
 }
 
 func newMongoStore(c *mongoConfig) *mongoStore {
 	var err error
 	m := &mongoStore{
-		uricache:        ccache.New(ccache.Configure().MaxSize(1000000)),
-		namecache:       ccache.New(ccache.Configure().MaxSize(1000000)),
-		updatedPrefixes: make(map[string]struct{}),
+		uricache:  ccache.New(ccache.Configure().MaxSize(1000000)),
+		namecache: ccache.New(ccache.Configure().MaxSize(1000000)),
 	}
 	log.Noticef("Connecting to MongoDB at %v...", c.address.String())
 	m.session, err = mgo.Dial(c.address.String())
@@ -62,68 +58,6 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 
 	// add indexes. This will fail Fatal
 	m.addIndexes()
-
-	go func() {
-		for _ = range time.Tick(10 * time.Second) {
-			var updatedPrefixes []string
-			m.updatedPrefixesLock.Lock()
-			for pfx := range m.updatedPrefixes {
-				updatedPrefixes = append(updatedPrefixes, pfx)
-			}
-			m.updatedPrefixes = make(map[string]struct{})
-			m.updatedPrefixesLock.Unlock()
-			t := time.Now()
-			for _, pfx := range updatedPrefixes {
-				// fetch the updates for this prefix
-				var records bson.M
-				err := m.prefixRecords.Find(bson.M{"__prefix": pfx}).One(&records)
-				if err != nil && err != mgo.ErrNotFound {
-					log.Error(errors.Wrap(err, "Problem fetching prefix updates"))
-					continue
-				}
-				update := make(bson.M)
-				for k, v := range records {
-					if k == "__prefix" {
-						continue // skip this
-					}
-					if record, ok := v.(bson.M); ok {
-						update[k] = record["value"].(string)
-					}
-				}
-				if len(update) == 0 {
-					continue // nothing to update
-				}
-
-				var uuidsToUpdate []string
-				err = m.mapping.Find(bson.M{"uri": bson.M{"$regex": "^" + pfx + ""}}).Distinct("uuid", &uuidsToUpdate)
-				if err != nil {
-					log.Error(errors.Wrap(err, "Problem fetching matching uris for prefix"))
-					continue
-				}
-				if len(uuidsToUpdate) == 0 {
-					continue
-				}
-				chunksize := 500
-				startBlock := 0
-				endBlock := startBlock + chunksize
-				for startBlock < len(uuidsToUpdate) {
-					if endBlock > len(uuidsToUpdate) {
-						endBlock = len(uuidsToUpdate)
-					}
-					batch := uuidsToUpdate[startBlock:endBlock]
-					startBlock += chunksize
-					endBlock += chunksize
-
-					_, err := m.documents.UpdateAll(bson.M{"uuid": bson.M{"$in": batch}}, bson.M{"$set": update})
-					if err != nil {
-						log.Error(errors.Wrap(err, "Problem updating metadata for prefix"))
-						continue
-					}
-				}
-			}
-			log.Noticef("Updated %d prefixes in %s", len(updatedPrefixes), time.Since(t))
-		}
-	}()
 
 	return m
 }
@@ -296,13 +230,13 @@ func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
 		return nil
 	}
 	m.prefixRecordsLock.Lock()
-	m.updatedPrefixesLock.Lock()
-	defer m.updatedPrefixesLock.Unlock()
 	defer m.prefixRecordsLock.Unlock()
 	// now insert the updated metadata records, grouped by their stripped prefix
 	for _, rec := range records {
+		if rec.Key == "lastalive" {
+			continue
+		}
 		pfx := StripBangMeta(rec.SrcURI)
-		m.updatedPrefixes[pfx] = struct{}{} // mark this prefix as needing updates
 		update := bson.M{"$set": bson.M{rec.Key: rec}}
 		_, err := m.prefixRecords.Upsert(bson.M{"__prefix": pfx}, update)
 		if err != nil && !mgo.IsDup(err) {
@@ -323,8 +257,11 @@ func (m *mongoStore) AddNameTag(name string, uuid common.UUID) error {
 	updateContents := bson.M{
 		"$set": bson.M{"_name": name},
 	}
+	log.Info(uuid, name)
 	if err := m.documents.Update(updateFilter, updateContents); err != nil && !mgo.IsDup(err) {
 		return err
+	} else if mgo.IsDup(err) {
+		log.Warning(err)
 	}
 	m.namecache.Set(name+uuid.String(), struct{}{}, 30*time.Minute)
 	return nil
@@ -342,9 +279,6 @@ func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
 	// mark prefixes of new timeseries as 'new' so that we know that we update them
 	m.prefixRecordsLock.Lock()
 	defer m.prefixRecordsLock.Unlock()
-	for _, pfx := range GetURIPrefixes(uri) {
-		m.updatedPrefixes[pfx] = struct{}{}
-	}
 
 	if _, err := m.mapping.Upsert(bson.M{"uuid": uuid}, bson.M{"uuid": uuid, "uri": uri}); err != nil && !mgo.IsDup(err) {
 		return errors.Wrap(err, "Could not insert uuid,uri mapping")

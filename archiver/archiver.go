@@ -2,9 +2,11 @@ package archiver
 
 import (
 	"fmt"
+	"github.com/gtfierro/bw2util"
 	"github.com/gtfierro/pundat/common"
 	"github.com/gtfierro/pundat/dots"
 	"github.com/gtfierro/pundat/querylang"
+	"github.com/gtfierro/pundat/scraper"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -36,16 +38,21 @@ type Archiver struct {
 	svc       *bw2.Service
 	iface     *bw2.Interface
 	vm        *viewManager
-	ms        *metadatasubscriber
 	qp        *querylang.QueryProcessor
 	config    *Config
 	stop      chan bool
+
+	bw2address string
+	bw2entity  string
 }
 
 func NewArchiver(c *Config) (a *Archiver) {
+	scraper.Init()
 	a = &Archiver{
-		config: c,
-		stop:   make(chan bool),
+		config:     c,
+		stop:       make(chan bool),
+		bw2address: c.BOSSWAVE.Address,
+		bw2entity:  c.BOSSWAVE.Entityfile,
 	}
 	// enable profiling if configured
 	if c.Benchmark.EnableCPUProfile {
@@ -61,9 +68,9 @@ func NewArchiver(c *Config) (a *Archiver) {
 	if err != nil {
 		log.Fatal(errors.Wrapf(err, "Could not resolve Metadata address %s", c.Metadata.Address))
 	}
-	a.MD = newMongoStore(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix})
+	a.MD = newMongoStore2(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix})
 
-	a.TS = newBTrDBv4(&btrdbv4Config{addresses: []string{c.BtrDB.Address}})
+	a.TS = &dummyts{} //newBTrDBv4(&btrdbv4Config{addresses: []string{c.BtrDB.Address}})
 
 	// setup bosswave
 	a.bw = bw2.ConnectOrExit(c.BOSSWAVE.Address)
@@ -78,10 +85,8 @@ func NewArchiver(c *Config) (a *Archiver) {
 	}
 	a.dotmaster = dots.NewDotMaster(a.bw, expiry)
 
-	a.ms = newMetadataSubscriber(a.bw, a.MD)
-
 	// setup view manager
-	a.vm = newViewManager(a.bw, a.vk, c.BOSSWAVE, a.MD, a.TS, a.ms)
+	a.vm = newViewManager(a.bw, a.vk, c.BOSSWAVE, a.MD, a.TS)
 
 	a.qp = querylang.NewQueryProcessor()
 
@@ -105,6 +110,19 @@ func NewArchiver(c *Config) (a *Archiver) {
 func (a *Archiver) Serve() {
 	for _, namespace := range a.config.BOSSWAVE.ListenNS {
 		a.vm.subscribeNamespace(namespace)
+
+		_mdclient := bw2.ConnectOrExit(a.bw2address)
+		_mdclient.OverrideAutoChainTo(true)
+		vk := _mdclient.SetEntityFileOrExit(a.bw2entity)
+		mdclient, err := bw2util.NewClient(_mdclient, vk)
+		if err != nil {
+			log.Fatal(err)
+		}
+		l := &scraper.Listener{
+			Client:    mdclient,
+			Namespace: namespace,
+		}
+		go l.Init()
 	}
 	<-a.stop
 }

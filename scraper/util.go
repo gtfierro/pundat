@@ -1,4 +1,4 @@
-package main
+package scraper
 
 import (
 	ldbutil "github.com/syndtr/goleveldb/leveldb/util"
@@ -6,11 +6,21 @@ import (
 )
 
 var metasuffix = []byte("/!meta")
+var metasuffixstr = "/!meta"
 
 func getURIKey(uri string) string {
 	li := strings.LastIndex(uri, "/")
 	if li > 0 {
 		return uri[li+1:]
+	}
+	return uri
+}
+
+// returns the uri stripped of "/!meta/<keyname>"
+func getStrippedURI(uri string) string {
+	li := strings.LastIndex(uri, metasuffixstr)
+	if li > 0 {
+		return uri[:li]
 	}
 	return uri
 }
