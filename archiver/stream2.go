@@ -149,6 +149,12 @@ func (s *Stream2) start(timeseriesStore TimeseriesStore, metadataStore MetadataS
 							value_f64 = float64(value_u64)
 						} else if value_i64, ok := value.(int64); ok {
 							value_f64 = float64(value_i64)
+						} else if value_bool, ok := value.(bool); ok {
+							if value_bool {
+								value_f64 = float64(1)
+							} else {
+								value_f64 = float64(0)
+							}
 						} else {
 							log.Errorf("Value %+v was not a float64 (was %T)", value, value)
 							continue
@@ -165,6 +171,12 @@ func (s *Stream2) start(timeseriesStore TimeseriesStore, metadataStore MetadataS
 						value_f64 = float64(value_u64)
 					} else if value_i64, ok := value.(int64); ok {
 						value_f64 = float64(value_i64)
+					} else if value_bool, ok := value.(bool); ok {
+						if value_bool {
+							value_f64 = float64(1)
+						} else {
+							value_f64 = float64(0)
+						}
 					} else {
 						log.Errorf("Value %+v was not a float64 (was %T)", value, value)
 						continue
