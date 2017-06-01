@@ -257,6 +257,7 @@ func (a *Archiver) maskMetadataGroupsByPermission(vk string, metadata []common.M
 	for _, group := range metadata {
 		// need to resolve path
 		if group.URI == "" {
+			log.Error("NULL URI")
 			uri, err := a.MD.URIFromUUID(group.UUID)
 			if err != nil {
 				return ret, err

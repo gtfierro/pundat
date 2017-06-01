@@ -36,17 +36,21 @@ func newMongoStore2(c *mongoConfig) *mongo_store2 {
 
 	go func() {
 		for _ = range time.Tick(30 * time.Second) {
+			var updates []interface{}
 			for _, doc := range m.pfxdb.GetUpdatedDocuments() {
 				delete(doc, "name")
 				delete(doc, "unit")
 				delete(doc, "uri")
-				log.Info(doc)
-				changeinfo, err := m.documents.UpdateAll(bson.M{"originaluri": doc["originaluri"]}, bson.M{"$set": doc})
-				if err != nil {
-					log.Error(errors.Wrap(err, "Could not update metadata"))
-				}
-				log.Info("Updated", changeinfo.Updated)
+				updates = append(updates, bson.M{"originaluri": doc["originaluri"]}, bson.M{"$set": doc})
 			}
+			batch := m.documents.Bulk()
+			batch.UpdateAll(updates...)
+			info, err := batch.Run()
+			if err != nil {
+				log.Error(err.(*mgo.BulkError))
+				log.Error(errors.Wrap(err, "Could not update metadata"))
+			}
+			log.Info("Updated", info.Modified)
 		}
 	}()
 
@@ -159,7 +163,6 @@ func (m *mongo_store2) InitializeURI(uri, rewrittenURI, name, unit string, uuid 
 	doc["originaluri"] = uri
 	doc["uri"] = rewrittenURI
 	doc["uuid"] = uuid.String()
-	log.Debug("NEW", doc)
 
 	if _, insertErr := m.documents.Upsert(bson.M{"uuid": doc["uuid"]}, doc); insertErr != nil {
 		return insertErr

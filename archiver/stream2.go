@@ -43,9 +43,8 @@ func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore Meta
 		return metadataErr
 	}
 
-	// do initialization with the timeseries store
+	// TODO: do initialization with the timeseries store
 
-	log.Debug(currentUUID, rewrittenURI)
 	return nil
 }
 
@@ -75,7 +74,8 @@ func (s *Stream2) start(timeseriesStore TimeseriesStore, metadataStore MetadataS
 				}
 				currentUUID = s.seenURIs[msg.URI]
 			}
-			log.Debug(currentUUID)
+			_ = currentUUID
+			//log.Debug(currentUUID)
 
 		}
 	}()

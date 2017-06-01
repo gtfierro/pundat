@@ -123,7 +123,7 @@ func (pfxdb *PrefixDB) GetUpdatedDocuments() []bson.M {
 		doc := pfxdb.Lookup(string(i.(URI)))
 		doc["originaluri"] = string(i.(URI))
 		records = append(records, doc)
-		return i == max
+		return i != max
 	}
 	touse.Ascend(iter)
 	return records
@@ -194,7 +194,6 @@ func (pfxdb *PrefixDB) Lookup(uri string) bson.M {
 
 	// add this URI to the dependencies
 	go func() {
-		log.Warning(string(uribytes))
 		if tx, err := pfxdb.dependencies.OpenTransaction(); err != nil {
 			log.Fatal(err)
 		} else if err := tx.Put(uribytes, []byte{}, nil); err != nil {
