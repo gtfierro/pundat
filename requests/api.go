@@ -3,6 +3,7 @@ package requests
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	messages "github.com/gtfierro/pundat/archiver"
@@ -90,7 +91,7 @@ func RemoveAllArchiveRequests(client *bw2.BW2Client, uri string) error {
 func RemoveArchiveRequestsFromConfig(client *bw2.BW2Client, configFile string) error {
 	config, err := ReadConfig(configFile)
 	if err != nil {
-		return errors.Wrap(err, "Could not read config")
+		log.Fatal(errors.Wrap(err, "Could not read config"))
 	}
 	var remove []*ArchiveRequest
 	for _, req := range config.DummyArchiveRequests {
@@ -133,7 +134,7 @@ func RemoveArchiveRequestList(client *bw2.BW2Client, removeRequests ...*ArchiveR
 		} else {
 			err = AttachArchiveRequests(client, keep...)
 			if err != nil {
-				return errors.Wrap(err, "Could not set ArchiveRequests")
+				log.Fatal(errors.Wrap(err, "Could not set ArchiveRequests"))
 			}
 		}
 	}
@@ -144,7 +145,7 @@ func RemoveArchiveRequestList(client *bw2.BW2Client, removeRequests ...*ArchiveR
 func AddArchiveRequestsFromConfig(client *bw2.BW2Client, configFile string) error {
 	config, err := ReadConfig(configFile)
 	if err != nil {
-		return errors.Wrap(err, "Could not read config")
+		log.Fatal(errors.Wrap(err, "Could not read config"))
 	}
 	var attach []*ArchiveRequest
 	for _, req := range config.DummyArchiveRequests {
@@ -158,13 +159,13 @@ func AttachArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) e
 	// sanity check the parameters
 	for _, request := range requests {
 		if request.PO == "" {
-			return errors.New("Need a valid PO number")
+			log.Fatal(errors.New("Need a valid PO number"))
 		}
 		if request.ValueExpr == "" {
-			return errors.New("Need a Value expression")
+			log.Fatal(errors.New("Need a Value expression"))
 		}
 		if request.Name == "" {
-			return errors.New("Need a Name")
+			log.Fatal(errors.New("Need a Name"))
 		}
 		request.AttachURI = normalizeNamespace(client, addRequestSuffix(request.AttachURI))
 		toadd[request.AttachURI] = append(toadd[request.AttachURI], request)
@@ -202,13 +203,13 @@ func MergeArchiveRequests(client *bw2.BW2Client, requests ...*ArchiveRequest) er
 	// sanity check the parameters
 	for _, request := range requests {
 		if request.PO == "" {
-			return errors.New("Need a valid PO number")
+			log.Fatal(errors.New("Need a valid PO number"))
 		}
 		if request.ValueExpr == "" {
-			return errors.New("Need a Value expression")
+			log.Fatal(errors.New("Need a Value expression"))
 		}
 		if request.Name == "" {
-			return errors.New("Need a Name")
+			log.Fatal(errors.New("Need a Name"))
 		}
 		request.AttachURI = normalizeNamespace(client, addRequestSuffix(request.AttachURI))
 	}
@@ -217,7 +218,7 @@ requestLoop:
 	for _, request := range requests {
 		existingRequests, err := GetArchiveRequests(client, request.AttachURI)
 		if err != nil {
-			return errors.Wrap(err, "Could not fetch existing Archive Requests")
+			log.Fatal(errors.Wrap(err, "Could not fetch existing Archive Requests"))
 		}
 		// add requests to existingRequests if they are not already in there
 		for _, existing := range existingRequests {
