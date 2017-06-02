@@ -127,7 +127,7 @@ func startArchiver(c *cli.Context) error {
 	if config.Archiver.PeriodicReport {
 		go func() {
 			for {
-				time.Sleep(10 * time.Second)
+				time.Sleep(30 * time.Second)
 				log.Infof("Number of active goroutines %v", runtime.NumGoroutine())
 			}
 		}()
