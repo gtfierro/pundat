@@ -63,12 +63,11 @@ func newMongoStore2(c *mongoConfig) *mongo_store2 {
 			}
 			batch := m.documents.Bulk()
 			batch.UpdateAll(updates...)
-			info, err := batch.Run()
-			if err != nil {
-				log.Error(err.(*mgo.BulkError))
-				log.Error(errors.Wrap(err, "Could not update metadata"))
+			if info, err := batch.Run(); err != nil && len(err.(*mgo.BulkError).Cases()) > 0 {
+				log.Error(errors.Wrap(err.(*mgo.BulkError), "Could not update metadata"))
+			} else if info != nil {
+				log.Info("Updated", info.Modified)
 			}
-			log.Info("Updated", info.Modified)
 		}
 	}()
 

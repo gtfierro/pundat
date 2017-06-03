@@ -106,7 +106,7 @@ func (l *Listener) startWorker() {
 		//uri := msg.URI
 		mdobj := common.RecordFromMessageKey(msg)
 		if len(mdobj.SrcURI) == 0 {
-			log.Error("PODFSMetadata object was not a MetadataPayloadObject")
+			log.Warning("PODFSMetadata object was not a MetadataPayloadObject")
 			continue
 		}
 		if err := DB.InsertRecords(mdobj); err != nil {
@@ -115,32 +115,3 @@ func (l *Listener) startWorker() {
 		}
 	}
 }
-
-//func main() {
-//	_client := bw2.ConnectOrExit("")
-//	_client.OverrideAutoChainTo(true)
-//	vk := _client.SetEntityFromEnvironOrExit()
-//
-//	client, err := bw2util.NewClient(_client, vk)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	namespaces := []string{"ucberkeley", "ciee", "amplab", "scratch.ns"}
-//
-//	for _, ns := range namespaces {
-//		l := &listener{
-//			Client:    client,
-//			Namespace: ns,
-//		}
-//		go l.init()
-//	}
-//	reader := bufio.NewReader(os.Stdin)
-//	for {
-//		fmt.Print("URI: ")
-//		text, _ := reader.ReadString('\n')
-//		for key, val := range DB.Lookup(text) {
-//			fmt.Println(">", key, "=", val)
-//		}
-//	}
-//}
