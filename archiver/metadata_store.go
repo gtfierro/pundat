@@ -1,46 +1,38 @@
 package archiver
 
 import (
-	"fmt"
 	"net"
-	"sync"
 	"time"
 
+	"github.com/coocood/freecache"
 	"github.com/gtfierro/pundat/common"
-	"github.com/karlseguin/ccache"
+	"github.com/gtfierro/pundat/scraper"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
-
-type groupedrecord struct {
-	Prefix  string
-	Records []bson.M
-}
 
 type mongoConfig struct {
 	address          *net.TCPAddr
 	collectionPrefix string
 }
 
-type mongoStore struct {
-	session           *mgo.Session
-	db                *mgo.Database
-	metadata          *mgo.Collection
-	documents         *mgo.Collection
-	mapping           *mgo.Collection
-	prefixRecords     *mgo.Collection
-	prefixRecordsLock sync.Mutex
-
-	uricache  *ccache.Cache
-	namecache *ccache.Cache
+type mongo_store2 struct {
+	pfxdb     *scraper.PrefixDB
+	session   *mgo.Session
+	db        *mgo.Database
+	documents *mgo.Collection
+	uuidtouri *mgo.Collection
+	doccache  *freecache.Cache
+	uricache  *freecache.Cache
 }
 
-func newMongoStore(c *mongoConfig) *mongoStore {
+func newMongoStore2(c *mongoConfig) *mongo_store2 {
 	var err error
-	m := &mongoStore{
-		uricache:  ccache.New(ccache.Configure().MaxSize(1000000)),
-		namecache: ccache.New(ccache.Configure().MaxSize(1000000)),
+	m := &mongo_store2{
+		pfxdb:    scraper.DB,
+		doccache: freecache.NewCache(50 * 1024 * 1024),
+		uricache: freecache.NewCache(50 * 1024 * 1024),
 	}
 	log.Noticef("Connecting to MongoDB at %v...", c.address.String())
 	m.session, err = mgo.Dial(c.address.String())
@@ -49,105 +41,50 @@ func newMongoStore(c *mongoConfig) *mongoStore {
 		return nil
 	}
 	log.Notice("...connected!")
-	// fetch/create collections and db reference
 	m.db = m.session.DB(c.collectionPrefix + "_pundat")
-	m.metadata = m.db.C("metadata")
-	m.mapping = m.db.C("mapping")
 	m.documents = m.db.C("documents")
-	m.prefixRecords = m.db.C("prefix_records")
-
+	m.uuidtouri = m.db.C("uuidtouri")
 	// add indexes. This will fail Fatal
 	m.addIndexes()
+
+	go func() {
+		for _ = range time.Tick(30 * time.Second) {
+			var updates []interface{}
+			for _, doc := range m.pfxdb.GetUpdatedDocuments() {
+				// get uuid from originaluri
+				uuid, err := m.UUIDFromURI(doc["originaluri"].(string))
+				if err != nil {
+					log.Error(errors.Wrap(err, "Could not get UUID from URI"))
+				}
+				key := []byte(uuid.String())
+				if bytes, err := bson.Marshal(doc); err != nil {
+					log.Error(errors.Wrap(err, "Could not serialize bson.M doc for cache"))
+				} else if err := m.doccache.Set(key, bytes, -1); err != nil {
+					log.Error(errors.Wrap(err, "Could not add doc to cache"))
+				}
+				delete(doc, "name")
+				delete(doc, "unit")
+				delete(doc, "uri")
+				updates = append(updates, bson.M{"originaluri": doc["originaluri"]}, bson.M{"$set": doc})
+			}
+			batch := m.documents.Bulk()
+			batch.UpdateAll(updates...)
+			if info, err := batch.Run(); err != nil && len(err.(*mgo.BulkError).Cases()) > 0 {
+				log.Error(errors.Wrap(err.(*mgo.BulkError), "Could not update metadata"))
+			} else if info != nil {
+				log.Info("Updated", info.Modified)
+			}
+		}
+	}()
 
 	return m
 }
 
-func (m *mongoStore) addIndexes() {
-	var err error
-	// create indexes
-	index := mgo.Index{
-		Key:        []string{"uuid", "srcuri", "key"},
-		Unique:     true,
-		DropDups:   true,
-		Background: false,
-		Sparse:     false,
-	}
-	err = m.metadata.EnsureIndex(index)
-	if err != nil {
-		log.Fatalf("Could not create index on metadata.{UUID, srcuri, key} (%v)", err)
-	}
-
-	index.Key = []string{"uri", "uuid"}
-	err = m.mapping.EnsureIndex(index)
-	if err != nil {
-		log.Fatalf("Could not create index on mapping.{uri,uuid} (%v)", err)
-	}
-	index.Key = []string{"uuid"}
-	err = m.mapping.EnsureIndex(index)
-	if err != nil {
-		log.Fatalf("Could not create index on mapping.uuid (%v)", err)
-	}
-	index.Key = []string{"path", "uuid"}
-	err = m.documents.EnsureIndex(index)
-	if err != nil {
-		log.Fatalf("Could not create index on documents.{uri,uuid} (%v)", err)
-	}
-	index.Key = []string{"uuid"}
-	err = m.documents.EnsureIndex(index)
-	if err != nil {
-		log.Fatalf("Could not create index on documents.uuid (%v)", err)
-	}
-	index.Key = []string{"__prefix"}
-	err = m.prefixRecords.EnsureIndex(index)
-	if err != nil {
-		log.Fatalf("Could not create index on prefix_records.{__prefix} (%v)", err)
-	}
+func (m *mongo_store2) GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error) {
+	return common.UOT_NS, nil
 }
 
-func (m *mongoStore) GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error) {
-	var (
-		c   int
-		err error
-		res interface{}
-	)
-	uot := common.UOT_S
-	query := m.metadata.Find(bson.M{"uuid": uuid}).Select(bson.M{"UnitofTime": 1})
-	if c, err = query.Count(); err != nil {
-		return uot, errors.Wrapf(err, "Could not find any UnitofTime records")
-	} else if c == 0 {
-		return uot, fmt.Errorf("no stream named %v", uuid)
-	}
-	err = query.One(&res)
-	if entry, found := res.(bson.M)["UnitofTime"]; found {
-		if uotInt, isInt := entry.(int); isInt {
-			uot = common.UnitOfTime(uotInt)
-		} else {
-			return uot, fmt.Errorf("Invalid UnitOfTime retrieved? %v", entry)
-		}
-		uot = common.UnitOfTime(entry.(int))
-		if uot == 0 {
-			uot = common.UOT_S
-		}
-	}
-	return uot, nil
-}
-
-/*
-Here we describe the mechanism for how to retrieve metadata using a given VK.
-First, we run the unaltered query and retrieve the set of resulting docs. Then, we must
-filter the results by:
-- remove if the VK cannot build a chain to the URI of a returned stream
-- if the VK cannot build a chain to the URI for a piece of metadata:
-  - if the key is in tags, remove the result
-  - if the key is in "where", remove the result
-
-This requires testing and finish implementing the DOT stuff
-*/
-/*
-This needs to work better;
-first run GetUUIDs on the where clause, and then use that list of UUIDs as the new where clause
-*/
-func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([]common.MetadataGroup, error) {
+func (m *mongo_store2) GetMetadata(VK string, tags []string, where common.Dict) ([]common.MetadataGroup, error) {
 	var (
 		_results    []bson.M
 		whereClause bson.M
@@ -161,7 +98,8 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 		selectTags[tag] = 1
 	}
 	if len(tags) > 0 {
-		selectTags["path"] = 1
+		selectTags["uri"] = 1
+		selectTags["originaluri"] = 1
 		selectTags["uuid"] = 1
 	}
 
@@ -183,26 +121,7 @@ func (m *mongoStore) GetMetadata(VK string, tags []string, where common.Dict) ([
 	return results, nil
 }
 
-func (m *mongoStore) GetUUIDs(VK string, where common.Dict) ([]common.UUID, error) {
-	var (
-		whereClause bson.M
-		_uuids      []string
-	)
-	if len(where) != 0 {
-		whereClause = where.ToBSON()
-	}
-	staged := m.documents.Find(whereClause)
-	if err := staged.Distinct("uuid", &_uuids); err != nil {
-		return nil, errors.Wrap(err, "Could not select UUID")
-	}
-	var uuids []common.UUID
-	for _, uuid := range _uuids {
-		uuids = append(uuids, common.ParseUUID(uuid))
-	}
-	return uuids, nil
-}
-
-func (m *mongoStore) GetDistinct(VK string, tag string, where common.Dict) ([]string, error) {
+func (m *mongo_store2) GetDistinct(VK string, tag string, where common.Dict) ([]string, error) {
 	var (
 		whereClause bson.M
 		distincts   []string
@@ -222,90 +141,125 @@ func (m *mongoStore) GetDistinct(VK string, tag string, where common.Dict) ([]st
 	return distincts, nil
 }
 
-// save the records to prefixRecords, where they are grouped by their stripped prefix (which is their URI
-// but without !meta/keyname at the end).
-func (m *mongoStore) SaveMetadata(records []*common.MetadataRecord) error {
-	if len(records) == 0 {
-		log.Infof("Aborting metadata insert with 0 records")
-		return nil
+func (m *mongo_store2) GetUUIDs(VK string, where common.Dict) ([]common.UUID, error) {
+	var (
+		whereClause bson.M
+		_uuids      []string
+	)
+	if len(where) != 0 {
+		whereClause = where.ToBSON()
 	}
-	m.prefixRecordsLock.Lock()
-	defer m.prefixRecordsLock.Unlock()
-	// now insert the updated metadata records, grouped by their stripped prefix
-	for _, rec := range records {
-		if rec.Key == "lastalive" {
-			continue
-		}
-		pfx := StripBangMeta(rec.SrcURI)
-		update := bson.M{"$set": bson.M{rec.Key: rec}}
-		_, err := m.prefixRecords.Upsert(bson.M{"__prefix": pfx}, update)
-		if err != nil && !mgo.IsDup(err) {
-			return errors.Wrapf(err, "Could not insert record %v into prefixRecords", rec)
-		}
+	staged := m.documents.Find(whereClause)
+	if err := staged.Distinct("uuid", &_uuids); err != nil {
+		return nil, errors.Wrap(err, "Could not select UUID")
 	}
-
-	return nil
+	var uuids []common.UUID
+	for _, uuid := range _uuids {
+		uuids = append(uuids, common.ParseUUID(uuid))
+	}
+	return uuids, nil
 }
 
-func (m *mongoStore) AddNameTag(name string, uuid common.UUID) error {
-	if m.namecache.Get(name+uuid.String()) != nil {
-		return nil
+func (m *mongo_store2) URIFromUUID(uuid common.UUID) (string, error) {
+	var uri interface{}
+	err := m.uuidtouri.Find(bson.M{"uuid": uuid.String()}).Select(bson.M{"uri": 1}).One(&uri)
+	return uri.(bson.M)["uri"].(string), err
+}
+
+func (m *mongo_store2) UUIDFromURI(uri string) (common.UUID, error) {
+	bytes, err := m.uricache.Get([]byte(uri))
+	if err == freecache.ErrNotFound {
+		var _uuid interface{}
+		if err := m.uuidtouri.Find(bson.M{"uri": uri}).Select(bson.M{"uuid": 1}).One(&_uuid); err != nil {
+			return nil, err
+		}
+		uuid := _uuid.(bson.M)["uuid"].(string)
+		if err := m.uricache.Set([]byte(uri), []byte(uuid), -1); err != nil {
+			return nil, err
+		}
+		return common.UUID(uuid), nil
+	} else if err != nil {
+		return nil, err
 	}
-	updateFilter := bson.M{
-		"uuid": uuid,
+	return common.UUID(string(bytes)), nil
+}
+
+func (m *mongo_store2) InitializeURI(uri, rewrittenURI, name, unit string, uuid common.UUID) error {
+	log.Info("initializing", uri, name, unit)
+	doc := m.pfxdb.Lookup(uri)
+	doc["name"] = name
+	doc["unit"] = unit
+	doc["originaluri"] = uri
+	doc["uri"] = rewrittenURI
+	doc["uuid"] = uuid.String()
+
+	if _, insertErr := m.documents.Upsert(bson.M{"uuid": doc["uuid"]}, doc); insertErr != nil {
+		return insertErr
 	}
-	updateContents := bson.M{
-		"$set": bson.M{"_name": name},
+	if _, insertErr := m.uuidtouri.Upsert(bson.M{"uuid": doc["uuid"]}, bson.M{"uuid": doc["uuid"], "uri": doc["uri"]}); insertErr != nil {
+		return insertErr
 	}
-	log.Info(uuid, name)
-	if err := m.documents.Update(updateFilter, updateContents); err != nil && !mgo.IsDup(err) {
+	if err := m.uricache.Set([]byte(uri), []byte(uuid.String()), -1); err != nil {
 		return err
-	} else if mgo.IsDup(err) {
-		log.Warning(err)
 	}
-	m.namecache.Set(name+uuid.String(), struct{}{}, 30*time.Minute)
+
 	return nil
 }
 
-func (m *mongoStore) RemoveMetadata(VK string, tags []string, where common.Dict) error {
-	return nil
+func (m *mongo_store2) addIndexes() {
+	index := mgo.Index{
+		Key:        []string{"uuid"},
+		Unique:     true,
+		DropDups:   true,
+		Background: false,
+		Sparse:     false,
+	}
+	err := m.documents.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on metadata.{uuid} (%v)", err)
+	}
+	index.Key = []string{"uri", "name", "unit"}
+	index.Unique = false
+	index.DropDups = false
+	err = m.documents.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on metadata.{uuid} (%v)", err)
+	}
+
+	index.Key = []string{"uri", "uuid"}
+	index.Unique = true
+	index.DropDups = true
+	err = m.uuidtouri.EnsureIndex(index)
+	if err != nil {
+		log.Fatalf("Could not create index on uuidtouri.{uri, uuid} (%v)", err)
+	}
 }
 
-func (m *mongoStore) MapURItoUUID(uri string, uuid common.UUID) error {
-	if m.uricache.Get(uri+uuid.String()) != nil {
+func (m *mongo_store2) GetDocument(uuid common.UUID) bson.M {
+	bytes, err := m.doccache.Get([]byte(uuid))
+	if err == freecache.ErrNotFound {
+		var mydoc bson.M
+		if err := m.documents.Find(bson.M{"uuid": uuid.String()}).Select(bson.M{"_id": 0}).One(&mydoc); err != nil {
+			log.Error(errors.Wrap(err, "Could not fetch doc from mongo"))
+			return nil
+		}
+		key := []byte(uuid.String())
+		if bytes, err := bson.Marshal(mydoc); err != nil {
+			log.Error(errors.Wrap(err, "Could not serialize bson.M doc for cache"))
+			return nil
+		} else if err := m.doccache.Set(key, bytes, -1); err != nil {
+			log.Error(errors.Wrap(err, "Could not add doc to cache"))
+			return nil
+		}
+		return mydoc
+	} else if err != nil {
+		log.Error(errors.Wrap(err, "Could not fetch doc from cache"))
 		return nil
 	}
-
-	// mark prefixes of new timeseries as 'new' so that we know that we update them
-	m.prefixRecordsLock.Lock()
-	defer m.prefixRecordsLock.Unlock()
-
-	if _, err := m.mapping.Upsert(bson.M{"uuid": uuid}, bson.M{"uuid": uuid, "uri": uri}); err != nil && !mgo.IsDup(err) {
-		return errors.Wrap(err, "Could not insert uuid,uri mapping")
+	var doc bson.M
+	if err := bson.Unmarshal(bytes, &doc); err != nil {
+		log.Error(errors.Wrap(err, "Could not unmarshal doc from cache"))
+		return nil
 	}
-	if _, err := m.documents.Upsert(bson.M{"uuid": uuid}, bson.M{"uuid": uuid, "path": uri}); err != nil && !mgo.IsDup(err) {
-		return errors.Wrap(err, "Could not insert uuid,uri new document")
-	}
-
-	m.uricache.Set(uri+uuid.String(), struct{}{}, 30*time.Minute)
-
-	return nil
-}
-
-// need to get this from the actual archiverequests
-func (m *mongoStore) URIFromUUID(uuid common.UUID) (uri string, err error) {
-	var uris []string
-	if err := m.mapping.Find(bson.M{"uuid": uuid}).Distinct("uri", &uris); err != nil {
-		return "", errors.Wrapf(err, "Could not find URIs for UUID %s", uuid)
-	}
-	if len(uris) > 1 {
-		return "", errors.Errorf("Got %d URIs for UUID %s, expected 1", len(uris), uuid)
-	} else if len(uris) == 0 {
-		return "", errors.Errorf("no URI found")
-	}
-	return uris[0], nil
-}
-
-func (m *mongoStore) URItoUUID(uri string) (common.UUID, error) {
-	return nil, nil
+	return doc
 }

@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"regexp"
 	"sync"
 	"time"
 
@@ -11,29 +12,23 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-type Stream struct {
-	// timeseries identifier
-	//UUID     common.UUID
-	uuidExpr []ob.Operation
-	// immutable source of the stream. What the Archive Request points to.
-	// This is what we subscribe to for data to archive (but not metadata)
-	uri  string
-	name string
-	// list of Metadata URIs
-	metadataURIs []string
+var commitTick = 5 * time.Second
+var commitCount = 256
+var annotationTick = 5 * time.Minute
 
-	// following fields used for parsing received messages
-	// the type of PO to extract
-	po int
-	// value expression
-	valueExpr   []ob.Operation
-	valueString string
-	// time expression
-	timeExpr  []ob.Operation
-	timeParse string
-
-	// following fields used for operation of the stream
-	cancel       chan bool
+type Stream2 struct {
+	// Archive request information
+	subscribeURI string
+	name         string
+	unit         string
+	po           string
+	valueExpr    []ob.Operation
+	timeExpr     []ob.Operation
+	timeParse    string
+	// uri rewriting
+	urimatch   *regexp.Regexp
+	urireplace string
+	// incoming data
 	subscription chan *bw2.SimpleMessage
 	buffer       chan *bw2.SimpleMessage
 	// maps URI -> UUID (under the other parameters of this archive request)
@@ -42,52 +37,14 @@ type Stream struct {
 	sync.RWMutex
 }
 
-func (s *Stream) URI() string {
-	return s.uri
-}
+func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore MetadataStore, msg *bw2.SimpleMessage) error {
+	// don't need to worry about escaping $ in the URI because bosswave doesn't allow it
+	rewrittenURI := s.urimatch.ReplaceAllString(msg.URI, s.urireplace)
 
-// when we see a URI for the first time, we need to initialize it:
-// - get the UUID
-// - metadatastore.MapURItoUUID
-// - metadatastore.AddNameTag
-// - create the necessary data structures in seenURIs, timeseries
-func (s *Stream) initialize(metadataStore MetadataStore, timeseriesStore TimeseriesStore, msg *bw2.SimpleMessage) error {
-	po := msg.POs[0]
-	// skip if its not the PO we expect
-	if !po.IsType(s.po, s.po) {
-		return nil
-	}
+	currentUUID := common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, rewrittenURI+s.name).String())
 
-	// unpack the message
-	//TODO: cannot assume msgpack
-	var thing interface{}
-	err := po.(bw2.MsgPackPayloadObject).ValueInto(&thing)
-	if err != nil {
-		return errors.Wrap(err, "Could not unmarshal msgpack object")
-	}
-	// if we have an expression to extract a UUID, we use that
-	var currentUUID common.UUID
-	if len(s.uuidExpr) > 0 {
-		currentUUID = ob.Eval(s.uuidExpr, thing).(common.UUID)
-	} else {
-		// generate the UUID for this message's URI, POnum and value expression (and the name, when we have it)
-		currentUUID = common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, msg.URI+po.GetPODotNum()+s.name).String())
-	}
-	//	When we observe a UUID, we need to build up the associations to its metadata
-	//	When I get a new UUID, with a URI, I need to find all of the Metadata rcords
-	//	in the MD database that are prefixes of this URI (w/o !meta suffix) and add
-	//	those associations in when we need to
-	//if err := metadataStore.MapURItoUUID(msg.URI, currentUUID); err != nil {
-	//	return err
-	//}
-
-	log.Debug("INITIALIZE", msg.URI, s.name, currentUUID)
-	//if err := metadataStore.AddNameTag(s.name, currentUUID); err != nil {
-	//	return err
-	//}
-
+	// update stream structures
 	s.Lock()
-	// add to the local maps
 	s.seenURIs[msg.URI] = currentUUID
 	s.timeseries[msg.URI] = common.Timeseries{
 		UUID:   currentUUID,
@@ -95,7 +52,23 @@ func (s *Stream) initialize(metadataStore MetadataStore, timeseriesStore Timeser
 	}
 	s.Unlock()
 
-	// start go routine to push readings to the db
+	// do initialization with the metadata store
+	if metadataErr := metadataStore.InitializeURI(msg.URI, rewrittenURI, s.name, s.unit, currentUUID); metadataErr != nil {
+		log.Error(errors.Wrapf(metadataErr, "Error initializing metadata store with URI %s", msg.URI))
+		return metadataErr
+	}
+
+	if exists, err := timeseriesStore.StreamExists(currentUUID); err != nil {
+		log.Error(errors.Wrapf(err, "Could not check stream exists (%s)", currentUUID.String()))
+		return err
+	} else if !exists {
+		if err := timeseriesStore.RegisterStream(currentUUID, rewrittenURI, s.name, s.unit); err != nil {
+			log.Error(errors.Wrapf(err, "Could not create stream (%s %s %s %s)", currentUUID.String(), msg.URI, s.name, s.unit))
+			return err
+		}
+	}
+
+	// start routine to push readings to the db
 	go func() {
 		for _ = range time.Tick(commitTick) {
 			s.RLock()
@@ -120,42 +93,57 @@ func (s *Stream) initialize(metadataStore MetadataStore, timeseriesStore Timeser
 		}
 	}()
 
+	// start goroutine to push stream metadata into timeseries store
+	go func() {
+		for _ = range time.Tick(annotationTick) {
+			log.Infof("Updating stream annotations for %s", msg.URI)
+			var uuids []common.UUID
+			s.RLock()
+			for _, ts := range s.timeseries {
+				uuids = append(uuids, ts.UUID)
+			}
+			s.RUnlock()
+			for _, uuid := range uuids {
+				if doc := metadataStore.GetDocument(uuid); doc == nil {
+					continue
+				} else if err := timeseriesStore.AddAnnotations(uuid, doc); err != nil {
+					log.Error(err)
+				}
+			}
+		}
+	}()
+
 	return nil
 }
 
-//
-func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
+func (s *Stream2) start(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
+	// put messages in the local buffer
 	go func() {
 		for msg := range s.subscription {
 			s.buffer <- msg
 		}
 	}()
+
+	// loop through the buffer
 	go func() {
-		// for each message we receive
 		for msg := range s.buffer {
 			if len(msg.POs) == 0 {
 				continue
 			}
-			// for each payload object in the message
-			var currentUUID common.UUID
-			var exists bool
-			if currentUUID, exists = s.seenURIs[msg.URI]; !exists {
+			// if we haven't seen this URI before, then we need to initialize it in order to get the UUID
+			if _, exists := s.seenURIs[msg.URI]; !exists {
 				// TODO: check error?
-				if err := s.initialize(metadataStore, timeseriesStore, msg); err != nil {
+				if err := s.initialize(timeseriesStore, metadataStore, msg); err != nil {
 					log.Error(err)
 					continue
 				}
-				currentUUID = s.seenURIs[msg.URI]
 			}
+
 			// grab the timeseries object
 			s.RLock()
 			ts := s.timeseries[msg.URI]
 			s.RUnlock()
-			po := msg.POs[0]
-			// skip if its not the PO we expect
-			if !po.IsType(s.po, s.po) {
-				continue
-			}
+			po := msg.GetOnePODF(s.po)
 
 			// unpack the message
 			//TODO: cannot assume msgpack
@@ -185,6 +173,12 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 							value_f64 = float64(value_u64)
 						} else if value_i64, ok := value.(int64); ok {
 							value_f64 = float64(value_i64)
+						} else if value_bool, ok := value.(bool); ok {
+							if value_bool {
+								value_f64 = float64(1)
+							} else {
+								value_f64 = float64(0)
+							}
 						} else {
 							log.Errorf("Value %+v was not a float64 (was %T)", value, value)
 							continue
@@ -201,6 +195,12 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 						value_f64 = float64(value_u64)
 					} else if value_i64, ok := value.(int64); ok {
 						value_f64 = float64(value_i64)
+					} else if value_bool, ok := value.(bool); ok {
+						if value_bool {
+							value_f64 = float64(1)
+						} else {
+							value_f64 = float64(0)
+						}
 					} else {
 						log.Errorf("Value %+v was not a float64 (was %T)", value, value)
 						continue
@@ -210,19 +210,6 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 				ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 				ts.Unlock()
 			}
-
-			// We will check the cache first (using new interface call into btrdb)
-			// and create the stream object if it doesn't exist.
-			if exists, err := timeseriesStore.StreamExists(currentUUID); err != nil {
-				log.Error(errors.Wrapf(err, "Could not check stream exists (%s)", currentUUID.String()))
-				continue
-			} else if !exists {
-				//if err := timeseriesStore.RegisterStream(currentUUID, msg.URI, s.name); err != nil {
-				//	log.Error(errors.Wrapf(err, "Could not create stream (%s %s %s)", currentUUID.String(), msg.URI, s.name))
-				//	continue
-				//}
-			}
-
 			ts.Lock()
 			if len(ts.Records) > commitCount {
 				// now we can assume the stream exists and can write to it
@@ -235,11 +222,12 @@ func (s *Stream) startArchiving(timeseriesStore TimeseriesStore, metadataStore M
 			s.Lock()
 			s.timeseries[msg.URI] = ts
 			s.Unlock()
+
 		}
 	}()
 }
 
-func (s *Stream) getTime(thing interface{}) time.Time {
+func (s *Stream2) getTime(thing interface{}) time.Time {
 	if len(s.timeExpr) == 0 {
 		return time.Now()
 	}
