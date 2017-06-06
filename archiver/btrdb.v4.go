@@ -95,6 +95,8 @@ func (bdb *btrdbv4Iface) createStream(streamuuid common.UUID, uri, name, unit st
 	// var tagValsRegex = regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&*\(\)._ -]*$`)
 	collection := uri
 
+	log.Info("Initializing timeseries stream", uri, streamuuid, name, unit)
+
 	stream, err = bdb.conn.Create(ctx, uuid.Parse(streamuuid.String()), collection, map[string]string{"name": name, "unit": unit}, nil)
 	if err == nil {
 		bdb.streamCacheLock.Lock()

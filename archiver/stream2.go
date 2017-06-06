@@ -38,7 +38,10 @@ type Stream2 struct {
 }
 
 func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore MetadataStore, msg *bw2.SimpleMessage) error {
-	currentUUID := common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, msg.URI+s.name).String())
+	// don't need to worry about escaping $ in the URI because bosswave doesn't allow it
+	rewrittenURI := s.urimatch.ReplaceAllString(msg.URI, s.urireplace)
+
+	currentUUID := common.ParseUUID(uuid.NewV3(NAMESPACE_UUID, rewrittenURI+s.name).String())
 
 	// update stream structures
 	s.Lock()
@@ -48,9 +51,6 @@ func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore Meta
 		SrcURI: msg.URI,
 	}
 	s.Unlock()
-
-	// don't need to worry about escaping $ in the URI because bosswave doesn't allow it
-	rewrittenURI := s.urimatch.ReplaceAllString(msg.URI, s.urireplace)
 
 	// do initialization with the metadata store
 	if metadataErr := metadataStore.InitializeURI(msg.URI, rewrittenURI, s.name, s.unit, currentUUID); metadataErr != nil {
@@ -62,7 +62,7 @@ func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore Meta
 		log.Error(errors.Wrapf(err, "Could not check stream exists (%s)", currentUUID.String()))
 		return err
 	} else if !exists {
-		if err := timeseriesStore.RegisterStream(currentUUID, msg.URI, s.name, s.unit); err != nil {
+		if err := timeseriesStore.RegisterStream(currentUUID, rewrittenURI, s.name, s.unit); err != nil {
 			log.Error(errors.Wrapf(err, "Could not create stream (%s %s %s %s)", currentUUID.String(), msg.URI, s.name, s.unit))
 			return err
 		}
