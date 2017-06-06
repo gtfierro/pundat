@@ -136,7 +136,7 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 		return errors.New("VK was empty in ArchiveRequest")
 	}
 
-	s2 := &Stream2{}
+	s2 := &Stream{}
 	s2.buffer = make(chan *bw2.SimpleMessage, 10000)
 	s2.seenURIs = make(map[string]common.UUID)
 	s2.timeseries = make(map[string]common.Timeseries)

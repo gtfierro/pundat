@@ -68,7 +68,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	if err != nil {
 		log.Fatal(errors.Wrapf(err, "Could not resolve Metadata address %s", c.Metadata.Address))
 	}
-	a.MD = newMongoStore2(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix})
+	a.MD = newMongoStore(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix})
 
 	a.TS = newBTrDBv4(&btrdbv4Config{addresses: []string{c.BtrDB.Address}})
 

@@ -16,7 +16,7 @@ var commitTick = 5 * time.Second
 var commitCount = 256
 var annotationTick = 5 * time.Minute
 
-type Stream2 struct {
+type Stream struct {
 	// Archive request information
 	subscribeURI string
 	name         string
@@ -37,7 +37,7 @@ type Stream2 struct {
 	sync.RWMutex
 }
 
-func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore MetadataStore, msg *bw2.SimpleMessage) error {
+func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore MetadataStore, msg *bw2.SimpleMessage) error {
 	// don't need to worry about escaping $ in the URI because bosswave doesn't allow it
 	rewrittenURI := s.urimatch.ReplaceAllString(msg.URI, s.urireplace)
 
@@ -116,7 +116,7 @@ func (s *Stream2) initialize(timeseriesStore TimeseriesStore, metadataStore Meta
 	return nil
 }
 
-func (s *Stream2) start(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
+func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
 	// put messages in the local buffer
 	go func() {
 		for msg := range s.subscription {
@@ -227,7 +227,7 @@ func (s *Stream2) start(timeseriesStore TimeseriesStore, metadataStore MetadataS
 	}()
 }
 
-func (s *Stream2) getTime(thing interface{}) time.Time {
+func (s *Stream) getTime(thing interface{}) time.Time {
 	if len(s.timeExpr) == 0 {
 		return time.Now()
 	}

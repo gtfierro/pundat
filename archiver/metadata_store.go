@@ -17,7 +17,7 @@ type mongoConfig struct {
 	collectionPrefix string
 }
 
-type mongo_store2 struct {
+type mongo_store struct {
 	pfxdb     *scraper.PrefixDB
 	session   *mgo.Session
 	db        *mgo.Database
@@ -27,9 +27,9 @@ type mongo_store2 struct {
 	uricache  *freecache.Cache
 }
 
-func newMongoStore2(c *mongoConfig) *mongo_store2 {
+func newMongoStore(c *mongoConfig) *mongo_store {
 	var err error
-	m := &mongo_store2{
+	m := &mongo_store{
 		pfxdb:    scraper.DB,
 		doccache: freecache.NewCache(50 * 1024 * 1024),
 		uricache: freecache.NewCache(50 * 1024 * 1024),
@@ -80,11 +80,11 @@ func newMongoStore2(c *mongoConfig) *mongo_store2 {
 	return m
 }
 
-func (m *mongo_store2) GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error) {
+func (m *mongo_store) GetUnitOfTime(VK string, uuid common.UUID) (common.UnitOfTime, error) {
 	return common.UOT_NS, nil
 }
 
-func (m *mongo_store2) GetMetadata(VK string, tags []string, where common.Dict) ([]common.MetadataGroup, error) {
+func (m *mongo_store) GetMetadata(VK string, tags []string, where common.Dict) ([]common.MetadataGroup, error) {
 	var (
 		_results    []bson.M
 		whereClause bson.M
@@ -121,7 +121,7 @@ func (m *mongo_store2) GetMetadata(VK string, tags []string, where common.Dict) 
 	return results, nil
 }
 
-func (m *mongo_store2) GetDistinct(VK string, tag string, where common.Dict) ([]string, error) {
+func (m *mongo_store) GetDistinct(VK string, tag string, where common.Dict) ([]string, error) {
 	var (
 		whereClause bson.M
 		distincts   []string
@@ -141,7 +141,7 @@ func (m *mongo_store2) GetDistinct(VK string, tag string, where common.Dict) ([]
 	return distincts, nil
 }
 
-func (m *mongo_store2) GetUUIDs(VK string, where common.Dict) ([]common.UUID, error) {
+func (m *mongo_store) GetUUIDs(VK string, where common.Dict) ([]common.UUID, error) {
 	var (
 		whereClause bson.M
 		_uuids      []string
@@ -160,13 +160,13 @@ func (m *mongo_store2) GetUUIDs(VK string, where common.Dict) ([]common.UUID, er
 	return uuids, nil
 }
 
-func (m *mongo_store2) URIFromUUID(uuid common.UUID) (string, error) {
+func (m *mongo_store) URIFromUUID(uuid common.UUID) (string, error) {
 	var uri interface{}
 	err := m.uuidtouri.Find(bson.M{"uuid": uuid.String()}).Select(bson.M{"uri": 1}).One(&uri)
 	return uri.(bson.M)["uri"].(string), err
 }
 
-func (m *mongo_store2) UUIDFromURI(uri string) (common.UUID, error) {
+func (m *mongo_store) UUIDFromURI(uri string) (common.UUID, error) {
 	bytes, err := m.uricache.Get([]byte(uri))
 	if err == freecache.ErrNotFound {
 		var _uuid interface{}
@@ -184,7 +184,7 @@ func (m *mongo_store2) UUIDFromURI(uri string) (common.UUID, error) {
 	return common.UUID(string(bytes)), nil
 }
 
-func (m *mongo_store2) InitializeURI(uri, rewrittenURI, name, unit string, uuid common.UUID) error {
+func (m *mongo_store) InitializeURI(uri, rewrittenURI, name, unit string, uuid common.UUID) error {
 	log.Info("initializing", uri, name, unit)
 	doc := m.pfxdb.Lookup(uri)
 	doc["name"] = name
@@ -206,7 +206,7 @@ func (m *mongo_store2) InitializeURI(uri, rewrittenURI, name, unit string, uuid 
 	return nil
 }
 
-func (m *mongo_store2) addIndexes() {
+func (m *mongo_store) addIndexes() {
 	index := mgo.Index{
 		Key:        []string{"uuid"},
 		Unique:     true,
@@ -235,7 +235,7 @@ func (m *mongo_store2) addIndexes() {
 	}
 }
 
-func (m *mongo_store2) GetDocument(uuid common.UUID) bson.M {
+func (m *mongo_store) GetDocument(uuid common.UUID) bson.M {
 	bytes, err := m.doccache.Get([]byte(uuid))
 	if err == freecache.ErrNotFound {
 		var mydoc bson.M
