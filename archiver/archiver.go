@@ -2,7 +2,6 @@ package archiver
 
 import (
 	"fmt"
-	"github.com/gtfierro/bw2util"
 	"github.com/gtfierro/pundat/common"
 	"github.com/gtfierro/pundat/dots"
 	"github.com/gtfierro/pundat/querylang"
@@ -86,7 +85,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.dotmaster = dots.NewDotMaster(a.bw, expiry)
 
 	// setup view manager
-	a.vm = newViewManager(a.bw, a.vk, c.BOSSWAVE, a.MD, a.TS)
+	a.vm = newViewManager(a.bw, a.vk, c.BOSSWAVE, a.MD, a.TS, a.bw2address, a.bw2entity)
 
 	a.qp = querylang.NewQueryProcessor()
 
@@ -110,20 +109,21 @@ func NewArchiver(c *Config) (a *Archiver) {
 func (a *Archiver) Serve() {
 	for _, namespace := range a.config.BOSSWAVE.ListenNS {
 		a.vm.subscribeNamespace(namespace)
-
-		_mdclient := bw2.ConnectOrExit(a.bw2address)
-		_mdclient.OverrideAutoChainTo(true)
-		vk := _mdclient.SetEntityFileOrExit(a.bw2entity)
-		mdclient, err := bw2util.NewClient(_mdclient, vk)
-		if err != nil {
-			log.Fatal(err)
-		}
-		l := &scraper.Listener{
-			Client:    mdclient,
-			Namespace: namespace,
-		}
-		go l.Init()
 	}
+
+	//	_mdclient := bw2.ConnectOrExit(a.bw2address)
+	//	_mdclient.OverrideAutoChainTo(true)
+	//	vk := _mdclient.SetEntityFileOrExit(a.bw2entity)
+	//	mdclient, err := bw2util.NewClient(_mdclient, vk)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	l := &scraper.Listener{
+	//		Client:    mdclient,
+	//		Namespace: namespace,
+	//	}
+	//	go l.Init()
+	//}
 	<-a.stop
 }
 
