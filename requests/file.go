@@ -70,7 +70,7 @@ func ReadConfig(filename string) (*Config, error) {
 	if err := yaml.Unmarshal(bytes, config); err != nil {
 		return config, errors.Wrap(err, "Could not unmarshal config file")
 	}
-	config.Prefix = strings.TrimSuffix(config.Prefix, "/")
+	//config.Prefix = strings.TrimSuffix(config.Prefix, "/")
 
 	if len(config.DummyArchiveRequests) == 0 {
 		return config, errors.New("Need to provide archive requests")

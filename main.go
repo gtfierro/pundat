@@ -263,10 +263,6 @@ func main() {
 			Action: nukeArchiveRequests,
 			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name:  "uri, u",
-					Usage: "URI to remove archive requests from",
-				},
-				cli.StringFlag{
 					Name:   "agent,a",
 					Value:  "127.0.0.1:28589",
 					Usage:  "Local BOSSWAVE Agent",
