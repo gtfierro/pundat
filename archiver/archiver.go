@@ -111,19 +111,6 @@ func (a *Archiver) Serve() {
 		a.vm.subscribeNamespace(namespace)
 	}
 
-	//	_mdclient := bw2.ConnectOrExit(a.bw2address)
-	//	_mdclient.OverrideAutoChainTo(true)
-	//	vk := _mdclient.SetEntityFileOrExit(a.bw2entity)
-	//	mdclient, err := bw2util.NewClient(_mdclient, vk)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	l := &scraper.Listener{
-	//		Client:    mdclient,
-	//		Namespace: namespace,
-	//	}
-	//	go l.Init()
-	//}
 	<-a.stop
 }
 

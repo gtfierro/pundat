@@ -10,9 +10,6 @@ type dummyts struct {
 func (ts *dummyts) StreamExists(uuid common.UUID) (bool, error) {
 	return true, nil
 }
-func (ts *dummyts) RegisterStream(uuid common.UUID, uri, name string) error {
-	return nil
-}
 func (ts *dummyts) AddReadings(common.Timeseries) error {
 	return nil
 }
@@ -39,4 +36,10 @@ func (ts *dummyts) DeleteData(uuids []common.UUID, start uint64, end uint64) err
 }
 func (ts *dummyts) ValidTimestamp(uint64, common.UnitOfTime) bool {
 	return true
+}
+func (ts *dummyts) AddAnnotations(uuid common.UUID, annotations map[string]interface{}) error {
+	return nil
+}
+func (ts *dummyts) RegisterStream(uuid common.UUID, uri, name, unit string) error {
+	return nil
 }

@@ -25,7 +25,6 @@ type viewManager struct {
 	incoming   chan *bw2.SimpleMessage
 	// map of alias -> VK namespace
 	namespaceAliases map[string]string
-	namespaceClients map[string]*bw2util.Client
 	subscribed       map[string]struct{}
 	namespaceLock    sync.Mutex
 	requestHosts     *SynchronizedArchiveRequestMap
@@ -43,7 +42,6 @@ func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store Metada
 		bw2entity:        bw2entity,
 		incoming:         make(chan *bw2.SimpleMessage, 100),
 		namespaceAliases: make(map[string]string),
-		namespaceClients: make(map[string]*bw2util.Client),
 		subscribed:       make(map[string]struct{}),
 		requestHosts:     NewSynchronizedArchiveRequestMap(),
 		requestURIs:      NewSynchronizedArchiveRequestMap(),
@@ -91,7 +89,6 @@ func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store Metada
 				}
 				requests = append(requests, request)
 			}
-			log.Debug(len(requests))
 			for _, request := range requests {
 				if err := vm.HandleArchiveRequest(request); err != nil {
 					log.Error(errors.Wrapf(err, "Could not handle archive request %+v", request))
@@ -107,11 +104,6 @@ func newViewManager(client *bw2.BW2Client, vk string, cfg BWConfig, store Metada
 func (vm *viewManager) subscribeNamespace(ns string) {
 	vm.namespaceLock.Lock()
 	defer vm.namespaceLock.Unlock()
-
-	// check if already subscribed
-	if _, found := vm.namespaceClients[ns]; found {
-		return
-	}
 
 	namespace := strings.TrimSuffix(ns, "/") + "/*/!meta/archiverequest"
 	log.Noticef("Intend to subscribe to %s", namespace)
@@ -129,6 +121,7 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 		log.Fatal(errors.Wrap(err, "Problem in multi subscribe"))
 	}
 	log.Noticef("Subscribe to %s", namespace)
+	log.Info("Creating new client for", ns)
 	data, _, err := c2.ResolveLongAlias(ns)
 	if err != nil {
 		log.Error(err)
@@ -136,8 +129,7 @@ func (vm *viewManager) subscribeNamespace(ns string) {
 	}
 	resolved_ns := bw2.ToBase64(data)
 	vm.namespaceAliases[ns] = resolved_ns
-	vm.namespaceClients[resolved_ns] = c2
-	vm.namespaceClients[ns] = c2
+	log.Infof("%+v", client)
 	go func() {
 		for msg := range inp {
 			vm.incoming <- msg
