@@ -82,7 +82,9 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 			}
 			// now we can assume the stream exists and can write to it
 			if err := timeseriesStore.AddReadings(ts); err != nil {
-				log.Fatal(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
+				log.Error(errors.Wrap(err, "Could not write timeseries reading (probably deadline exceeded)"))
+				ts.Unlock()
+				continue
 			}
 			//atomic.AddInt64(&count, -1*len(ts.Records))
 			ts.Records = []*common.TimeseriesReading{}
