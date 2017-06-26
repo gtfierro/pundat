@@ -8,6 +8,7 @@ import (
 	"github.com/gtfierro/pundat/common"
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/op/go-logging"
+	"github.com/pkg/errors"
 	//ldbutil "github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -62,7 +63,7 @@ func (l *Listener) Init() {
 		log.Notice("Initializing subscription to", l.subscribeURI)
 		subc, subErr = l.Client.MultiSubscribe(l.subscribeURI)
 		if subErr != nil {
-			log.Error(subErr)
+			log.Error(errors.Wrapf(subErr, "Could not subscribe %s", l.subscribeURI))
 			time.Sleep(30 * time.Second) // retry in 30 seconds
 		}
 		break
@@ -75,7 +76,7 @@ func (l *Listener) Init() {
 			URI: l.subscribeURI,
 		})
 		if queryErr != nil {
-			log.Error(queryErr)
+			log.Error(errors.Wrapf(queryErr, "Could not query %s", l.subscribeURI))
 			time.Sleep(30 * time.Second) // retry in 30 seconds
 		}
 		break
@@ -110,7 +111,7 @@ func (l *Listener) startWorker() {
 			continue
 		}
 		if err := DB.InsertRecords(mdobj); err != nil {
-			log.Error(err)
+			log.Error(errors.Wrap(err, "Could not insert record"))
 			continue
 		}
 	}
