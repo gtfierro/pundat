@@ -1090,7 +1090,7 @@ sqdefault:
 		sqDollar = sqS[sqpt-1 : sqpt+1]
 		//line query.y:357
 		{
-			sqVAL.str = strings.Trim(sqDollar[1].str, "\"")
+			sqVAL.str = strings.Trim(sqDollar[1].str, "\"'")
 		}
 	case 48:
 		sqDollar = sqS[sqpt-1 : sqpt+1]

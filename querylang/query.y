@@ -355,7 +355,7 @@ whereTerm : lvalue LIKE qstring
 
 qstring   : QSTRING
           {
-            $$ = strings.Trim($1,"\"")
+            $$ = strings.Trim($1,"\"'")
           }
           ;
 
