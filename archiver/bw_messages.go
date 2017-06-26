@@ -121,9 +121,9 @@ func (msg QueryChangedResult) IsEmpty() bool {
 }
 
 type KeyValueMetadata struct {
-	UUID     string
-	Path     string
-	Metadata map[string]interface{}
+	UUID     string                 `msgpack:"uuid"`
+	Path     string                 `msgpack:"path"`
+	Metadata map[string]interface{} `msgpack:"metadata"`
 }
 
 func (msg KeyValueMetadata) ToMsgPackBW() (po bw2.PayloadObject) {
@@ -153,11 +153,11 @@ func (msg KeyValueMetadata) Dump() string {
 }
 
 type Timeseries struct {
-	UUID       string
-	Path       string
-	Generation uint64
-	Times      []uint64
-	Values     []float64
+	UUID       string    `msgpack:"uuid"`
+	Path       string    `msgpack:"path"`
+	Generation uint64    `msgpack:"generation"`
+	Times      []uint64  `msgpack:"times"`
+	Values     []float64 `msgpack:"values"`
 }
 
 func (msg Timeseries) ToMsgPackBW() (po bw2.PayloadObject) {
@@ -179,7 +179,7 @@ func (msg Timeseries) Dump() string {
 	for i, time := range msg.Times {
 		res = append(res, []interface{}{time, msg.Values[i]})
 	}
-	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Timeseries": res}, "", "  "); err != nil {
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"uuid": msg.UUID, "Timeseries": res}, "", "  "); err != nil {
 		return fmt.Sprintf("%+v", res)
 	} else {
 		return string(bytes)
@@ -192,7 +192,7 @@ func (msg Timeseries) DumpWithFormattedTime() string {
 		formattime := time.Unix(0, int64(timestamp))
 		res = append(res, []interface{}{formattime, msg.Values[i]})
 	}
-	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Timeseries": res}, "", "  "); err != nil {
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"uuid": msg.UUID, "Timeseries": res}, "", "  "); err != nil {
 		return fmt.Sprintf("%+v", res)
 	} else {
 		return string(bytes)
@@ -200,13 +200,13 @@ func (msg Timeseries) DumpWithFormattedTime() string {
 }
 
 type Statistics struct {
-	UUID       string
-	Generation uint64
-	Times      []uint64
-	Count      []uint64
-	Min        []float64
-	Mean       []float64
-	Max        []float64
+	UUID       string    `msgpack:"uuid"`
+	Generation uint64    `msgpack:"generation"`
+	Times      []uint64  `msgpack:"times"`
+	Count      []uint64  `msgpack:"count"`
+	Min        []float64 `msgpack:"min"`
+	Mean       []float64 `msgpack:"mean"`
+	Max        []float64 `msgpack:"max"`
 }
 
 func (msg Statistics) ToMsgPackBW() (po bw2.PayloadObject) {
@@ -228,7 +228,7 @@ func (msg Statistics) Dump() string {
 	for i, time := range msg.Times {
 		res = append(res, []interface{}{time, msg.Count[i], msg.Min[i], msg.Mean[i], msg.Max[i]})
 	}
-	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Generation": msg.Generation, "Timeseries": res}, "", "  "); err != nil {
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"uuid": msg.UUID, "Generation": msg.Generation, "Timeseries": res}, "", "  "); err != nil {
 		return fmt.Sprintf("%+v", res)
 	} else {
 		return string(bytes)
@@ -241,7 +241,7 @@ func (msg Statistics) DumpWithFormattedTime() string {
 		formattime := time.Unix(0, int64(timestamp))
 		res = append(res, []interface{}{formattime, msg.Count[i], msg.Min[i], msg.Mean[i], msg.Max[i]})
 	}
-	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Generation": msg.Generation, "Timeseries": res}, "", "  "); err != nil {
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"uuid": msg.UUID, "Generation": msg.Generation, "Timeseries": res}, "", "  "); err != nil {
 		return fmt.Sprintf("%+v", res)
 	} else {
 		return string(bytes)
@@ -249,14 +249,14 @@ func (msg Statistics) DumpWithFormattedTime() string {
 }
 
 type ChangedRange struct {
-	UUID       string
-	Generation uint64
-	StartTime  int64
-	EndTime    int64
+	UUID       string `msgpack:"uuid"`
+	Generation uint64 `msgpack:"generation"`
+	StartTime  int64  `msgpack:"start"`
+	EndTime    int64  `msgpack:"end"`
 }
 
 func (msg ChangedRange) Dump() string {
-	if bytes, err := json.MarshalIndent(map[string]interface{}{"UUID": msg.UUID, "Generation": msg.Generation, "Start": msg.StartTime, "End": msg.EndTime}, "", "  "); err != nil {
+	if bytes, err := json.MarshalIndent(map[string]interface{}{"uuid": msg.UUID, "Generation": msg.Generation, "Start": msg.StartTime, "End": msg.EndTime}, "", "  "); err != nil {
 		return fmt.Sprintf("%+v", msg)
 	} else {
 		return string(bytes)
