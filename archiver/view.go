@@ -158,45 +158,46 @@ func (vm *viewManager) HandleArchiveRequest(request *ArchiveRequest) error {
 	s2.timeParse = request.TimeParse
 	re, err := regexp.Compile(request.URIMatch)
 	if err != nil {
+		log.Error(errors.Wrapf(err, "Could not parse regexp %s", request.URIMatch))
 		return err
 	}
 	s2.urimatch = re
 	s2.urireplace = request.URIReplace
 	ns := strings.Split(s2.subscribeURI, "/")[0]
 
-	vm.namespaceLock.Lock()
-	// subscribe to namespace if we aren't already
+	// create a client for this archive request
 	var (
 		client *bw2util.Client
-		found  bool
 	)
-	if client, found = vm.namespaceClients[ns]; !found {
-		_mdclient := bw2.ConnectOrExit(vm.bw2address)
-		_mdclient.OverrideAutoChainTo(true)
-		vk := _mdclient.SetEntityFileOrExit(vm.bw2entity)
-		client, err = bw2util.NewClient(_mdclient, vk)
-		if err != nil {
-			log.Fatal(err)
-		}
-		vm.namespaceClients[ns] = client
+	_mdclient := bw2.ConnectOrExit(vm.bw2address)
+	_mdclient.OverrideAutoChainTo(true)
+	vk := _mdclient.SetEntityFileOrExit(vm.bw2entity)
+	client, err = bw2util.NewClient(_mdclient, vk)
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	// check if we are subscribed to metadata on this namespace
+	vm.namespaceLock.Lock()
 	if _, found := vm.subscribed[ns]; !found {
 		l := &scraper.Listener{
 			Client:    client,
 			Namespace: ns,
 		}
 		go l.Init()
+		vm.subscribed[ns] = struct{}{} // mark as subscribed
 	}
-
 	vm.namespaceLock.Unlock()
 
-	sub, err := client.Subscribe(&bw2.SubscribeParams{
+	sub, err := client.BW2Client.Subscribe(&bw2.SubscribeParams{
 		URI: s2.subscribeURI,
 	})
 	if err != nil {
+		log.Error(errors.Wrapf(err, "Could not subscribe to %s", s2.subscribeURI))
 		return errors.Wrapf(err, "Could not subscribe to %s", s2.subscribeURI)
 	}
 	s2.subscription = sub
+	log.Info("Subscribing to", s2.subscribeURI)
 
 	// indicate that we've gotten an archive request
 	request.Dump()
