@@ -76,7 +76,12 @@ func ReadConfig(filename string) (*Config, error) {
 		return config, errors.New("Need to provide archive requests")
 	}
 	for i, req := range config.DummyArchiveRequests {
-		req.ArchiveURI = config.Prefix + strings.TrimPrefix(req.ArchiveURI, "/")
+		if len(req.ArchiveURI) > 0 {
+			req.ArchiveURI = config.Prefix + strings.TrimPrefix(req.ArchiveURI, "/")
+		} else {
+			req.ArchiveURI = strings.TrimSuffix(config.Prefix, "/")
+		}
+
 		req.AttachURI = config.Prefix + strings.TrimPrefix(req.AttachURI, "/")
 		if req.PO == "" {
 			req.PO = "2.0.0.0/8"
