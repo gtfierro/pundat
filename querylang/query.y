@@ -456,7 +456,7 @@ func NewSQLex(s string) *sqLex {
 	scanner := toki.NewScanner(
 		[]toki.Def{
 			{Token: WHERE, Pattern: "\bwhere\b"},
-			{Token: SELECT, Pattern: "\bselect\b"},
+			{Token: SELECT, Pattern: "select\b"},
             {Token: APPLY, Pattern: "\bapply\b"},
 			{Token: DELETE, Pattern: "\bdelete\b"},
 			{Token: DISTINCT, Pattern: "\bdistinct\b"},
