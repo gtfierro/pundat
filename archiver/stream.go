@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"math"
 	"regexp"
 	"sync"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-var commitTick = 5 * time.Second
+var commitTick = 30 * time.Second
 var commitCount = 256
 var annotationTick = 5 * time.Minute
 
@@ -82,7 +83,7 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 			}
 			// now we can assume the stream exists and can write to it
 			if err := timeseriesStore.AddReadings(ts); err != nil {
-				log.Error(errors.Wrap(err, "Could not write timeseries reading (probably deadline exceeded)"))
+				log.Error(errors.Wrap(err, "Could not write timeseries reading (probably deadline exceeded)"), len(ts.Records))
 				ts.Unlock()
 				continue
 			}
@@ -109,7 +110,7 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 				if doc := metadataStore.GetDocument(uuid); doc == nil {
 					continue
 				} else if err := timeseriesStore.AddAnnotations(uuid, doc); err != nil {
-					log.Error(err)
+					log.Error(errors.Wrap(err, "Could not write annotations"))
 				}
 			}
 		}
@@ -146,6 +147,10 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 			ts := s.timeseries[msg.URI]
 			s.RUnlock()
 			po := msg.GetOnePODF(s.po)
+
+			if po == nil {
+				continue
+			}
 
 			// unpack the message
 			//TODO: cannot assume msgpack
@@ -186,6 +191,9 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 							continue
 						}
 					}
+					if math.IsInf(value_f64, 0) || math.IsNaN(value_f64) {
+						continue
+					}
 					ts.Lock()
 					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 					ts.Unlock()
@@ -208,6 +216,9 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 						continue
 					}
 				}
+				if math.IsInf(value_f64, 0) || math.IsNaN(value_f64) {
+					continue
+				}
 				ts.Lock()
 				ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 				ts.Unlock()
@@ -217,8 +228,9 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 				// now we can assume the stream exists and can write to it
 				if err := timeseriesStore.AddReadings(ts); err != nil {
 					log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
+				} else {
+					ts.Records = []*common.TimeseriesReading{}
 				}
-				ts.Records = []*common.TimeseriesReading{}
 			}
 			ts.Unlock()
 			s.Lock()

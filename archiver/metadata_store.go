@@ -55,6 +55,7 @@ func newMongoStore(c *mongoConfig) *mongo_store {
 				uuid, err := m.UUIDFromURI(doc["originaluri"].(string))
 				if err != nil {
 					log.Error(errors.Wrap(err, "Could not get UUID from URI"))
+					continue
 				}
 				key := []byte(uuid.String())
 				if bytes, err := bson.Marshal(doc); err != nil {
