@@ -197,7 +197,7 @@ func (m *mongo_store) InitializeURI(uri, rewrittenURI, name, unit string, uuid c
 	if _, insertErr := m.documents.Upsert(bson.M{"uuid": doc["uuid"]}, doc); insertErr != nil {
 		return insertErr
 	}
-	if _, insertErr := m.uuidtouri.Upsert(bson.M{"uuid": doc["uuid"]}, bson.M{"uuid": doc["uuid"], "uri": doc["uri"]}); insertErr != nil {
+	if _, insertErr := m.uuidtouri.Upsert(bson.M{"uuid": doc["uuid"]}, bson.M{"uuid": doc["uuid"], "uri": doc["originaluri"]}); insertErr != nil {
 		return insertErr
 	}
 	if err := m.uricache.Set([]byte(uri), []byte(uuid.String()), -1); err != nil {
