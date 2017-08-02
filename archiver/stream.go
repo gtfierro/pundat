@@ -96,10 +96,20 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 		}
 	}()
 
+	return nil
+}
+
+func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
+	// put messages in the local buffer
+	go func() {
+		for msg := range s.subscription {
+			s.buffer <- msg
+		}
+	}()
+
 	// start goroutine to push stream metadata into timeseries store
 	go func() {
 		for _ = range time.Tick(annotationTick) {
-			log.Infof("Updating stream annotations for %s", msg.URI)
 			var uuids []common.UUID
 			s.RLock()
 			for _, ts := range s.timeseries {
@@ -110,20 +120,9 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 				if doc := metadataStore.GetDocument(uuid); doc == nil {
 					continue
 				} else if err := timeseriesStore.AddAnnotations(uuid, doc); err != nil {
-					log.Error(errors.Wrap(err, "Could not write annotations"))
+					log.Error(errors.Wrapf(err, "Could not write annotations for %s (%p)", uuid, s))
 				}
 			}
-		}
-	}()
-
-	return nil
-}
-
-func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
-	// put messages in the local buffer
-	go func() {
-		for msg := range s.subscription {
-			s.buffer <- msg
 		}
 	}()
 
