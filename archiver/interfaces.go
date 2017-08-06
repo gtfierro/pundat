@@ -56,4 +56,7 @@ type TimeseriesStore interface {
 	ValidTimestamp(uint64, common.UnitOfTime) bool
 
 	AddAnnotations(uuid common.UUID, annotations map[string]interface{}) error
+
+	// disconnects from database
+	Disconnect() error
 }

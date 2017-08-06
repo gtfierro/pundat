@@ -147,7 +147,6 @@ func (bdb *btrdbv4Iface) AddReadings(readings common.Timeseries) error {
 	if err != nil {
 		return errors.Wrap(err, "AddReadings: could not get stream")
 	}
-	// func (s *Stream) InsertF(ctx context.Context, length int, time func(int) int64, val func(int) float64) error
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -360,4 +359,8 @@ func (bdb *btrdbv4Iface) AddAnnotations(uuid common.UUID, updates map[string]int
 		// only expect one
 	}
 	return nil
+}
+
+func (bdb *btrdbv4Iface) Disconnect() error {
+	return bdb.conn.Disconnect()
 }

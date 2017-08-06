@@ -87,7 +87,6 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 				ts.Unlock()
 				continue
 			}
-			//atomic.AddInt64(&count, -1*len(ts.Records))
 			ts.Records = []*common.TimeseriesReading{}
 			ts.Unlock()
 			s.Lock()

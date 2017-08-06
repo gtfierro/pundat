@@ -2,17 +2,21 @@ package archiver
 
 import (
 	"fmt"
-	"github.com/gtfierro/pundat/common"
-	"github.com/gtfierro/pundat/dots"
-	"github.com/gtfierro/pundat/querylang"
-	"github.com/gtfierro/pundat/scraper"
+	"net"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	bw2 "github.com/immesys/bw2bind"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"github.com/pkg/profile"
-	"net"
-	"os"
-	"time"
+
+	"github.com/gtfierro/pundat/common"
+	"github.com/gtfierro/pundat/dots"
+	"github.com/gtfierro/pundat/querylang"
+	"github.com/gtfierro/pundat/scraper"
 )
 
 // logger
@@ -107,11 +111,20 @@ func NewArchiver(c *Config) (a *Archiver) {
 }
 
 func (a *Archiver) Serve() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigs
+		log.Info("GOT SIGNAL-->", sig)
+		a.stop <- true
+	}()
 	for _, namespace := range a.config.BOSSWAVE.ListenNS {
 		a.vm.subscribeNamespace(namespace)
 	}
 
 	<-a.stop
+
+	a.TS.Disconnect()
 }
 
 func (a *Archiver) Stop() {
