@@ -30,8 +30,7 @@ type Stream struct {
 	urimatch   *regexp.Regexp
 	urireplace string
 	// incoming data
-	subscription chan *bw2.SimpleMessage
-	buffer       chan *bw2.SimpleMessage
+	buffer chan *bw2.SimpleMessage
 	// maps URI -> UUID (under the other parameters of this archive request)
 	seenURIs   map[string]common.UUID
 	timeseries map[string]common.Timeseries
@@ -99,13 +98,6 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 }
 
 func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataStore) {
-	// put messages in the local buffer
-	go func() {
-		for msg := range s.subscription {
-			s.buffer <- msg
-		}
-	}()
-
 	// start goroutine to push stream metadata into timeseries store
 	go func() {
 		for _ = range time.Tick(annotationTick) {
