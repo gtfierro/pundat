@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -111,6 +112,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 }
 
 func (a *Archiver) Serve() {
+	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -119,12 +121,13 @@ func (a *Archiver) Serve() {
 		a.stop <- true
 	}()
 	for _, namespace := range a.config.BOSSWAVE.ListenNS {
-		a.vm.subscribeNamespace(namespace)
+		go a.vm.subscribeNamespace(ctx, namespace)
 	}
 
 	<-a.stop
 
 	a.TS.Disconnect()
+	cancel()
 }
 
 func (a *Archiver) Stop() {
