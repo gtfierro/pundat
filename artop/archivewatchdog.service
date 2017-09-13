@@ -1,0 +1,16 @@
+[Unit]
+Description=WatchDog Archive monitor
+
+[Service]
+Environment=WD_TOKEN=< token goes here >
+ExecStart=/home/oski/go/bin/artop \
+  --agent 172.17.0.1:28589 \
+  --entity <entity> \
+  --prefix <prefix> \
+  --ns <namespace>
+
+Restart=always
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target
