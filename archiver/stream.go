@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"math"
+	"math/rand"
 	"regexp"
 	"sync"
 	"time"
@@ -13,9 +14,12 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-var commitTick = 30 * time.Second
-var commitCount = 256
+var commitTick = 60 * time.Second
+var jitter = 30 // second
+var commitCount = 512
 var annotationTick = 5 * time.Minute
+
+var currentStreams int64 = 0
 
 type Stream struct {
 	// Archive request information
@@ -70,10 +74,12 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 
 	// start routine to push readings to the db
 	go func() {
-		for _ = range time.Tick(commitTick) {
+		for {
+			time.Sleep(commitTick + time.Duration(rand.Intn(jitter))*time.Second)
 			s.RLock()
 			ts := s.timeseries[msg.URI]
 			s.RUnlock()
+
 			ts.Lock()
 			// if no readings, then we give up
 			if len(ts.Records) == 0 {
