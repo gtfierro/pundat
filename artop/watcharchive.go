@@ -1,9 +1,11 @@
 package main
 
 import (
+	"container/ring"
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -13,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
+
+var removeSuffix = regexp.MustCompile("/signal/(.*)")
 
 func main() {
 	app := cli.NewApp()
@@ -110,7 +114,21 @@ func extractRequests(msg *bw2.SimpleMessage) []*ArchiveRequest {
 	return requests
 }
 
+func fixURI(uri string) string {
+	uri = strings.Replace(uri, "-", "_", -1)
+	uri = strings.Replace(uri, "+", "_", -1)
+	uri = strings.Replace(uri, "*", "_", -1)
+	uri = strings.ToLower(uri)
+	uri = removeSuffix.ReplaceAllString(uri, "")
+	return uri
+}
+
 func startWatcher(client *bw2util.Client, req *ArchiveRequest, ns, prefix string) {
+	//TODO: adapt to reporting rate. RLKick is 2* the reporting interval, with minimum of 2 minutes
+
+	// sliding window of report times
+	var reportWindow = ring.New(10)
+
 	c, err := client.Subscribe(&bw2.SubscribeParams{
 		URI: req.URI,
 	})
@@ -118,15 +136,43 @@ func startWatcher(client *bw2util.Client, req *ArchiveRequest, ns, prefix string
 		log.Println(errors.Wrapf(err, "Could not subscribe to %s", req.URI))
 		return
 	}
+	// clean uri
+	log.Println(req.URI)
+
+	parts := strings.Split(req.URI, "/")
+	parts[0] = ns
+	uri := fixURI(prefix + strings.Join(parts, "."))
+
+	log.Println(uri)
+	wd.Kick(uri, 30*60) // 30 min
 	for msg := range c {
 		po := msg.GetOnePODF(req.PO)
-		if po != nil {
-			uri := strings.Replace(msg.URI, "-", "_", -1)
-			parts := strings.Split(uri, "/")
-			parts[0] = ns
-			newuri := strings.Join(parts, ".")
-			if wd.RLKick(1*time.Minute, prefix+newuri, 120) {
-				log.Println("kicked", msg.URI)
+
+		reportWindow.Value = time.Now().UnixNano()
+		reportWindow = reportWindow.Next()
+
+		avgDiff := int64(0)
+		num := 0
+		prev := int64(0)
+		avg := func(v interface{}) {
+			if v != nil {
+				if prev > 0 {
+					avgDiff += (v.(int64) - prev)
+					num += 1
+				}
+				prev = v.(int64)
+			}
+		}
+
+		reportWindow.Do(avg)
+		interval := time.Duration(int64(float64(avgDiff)/float64(num))) * time.Nanosecond
+		if interval.Seconds() < 60 {
+			interval = 60 * time.Second
+		}
+
+		if po != nil && num > 1 {
+			if wd.RLKick(interval, uri, int(interval.Seconds()*2)) {
+				log.Println("kicked", uri, interval, reportWindow.Len())
 			}
 		}
 	}
