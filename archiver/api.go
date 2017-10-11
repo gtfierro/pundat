@@ -188,26 +188,6 @@ func (a *Archiver) packResults(params *common.DataParams, readings []common.Time
 	return readings
 }
 
-func (a *Archiver) packStatsResults(params *common.DataParams, readings []common.StatisticTimeseries) []common.StatisticTimeseries {
-	for i, resp := range readings {
-		resp.Lock()
-		if len(resp.Records) > 0 {
-			// apply data limit if exists
-			if params.DataLimit > 0 && len(resp.Records) > params.DataLimit {
-				resp.Records = resp.Records[:params.DataLimit]
-			}
-			// mark timestamps by how they should be transformed
-			for idx, rdg := range resp.Records {
-				rdg.Unit = params.ConvertToUnit
-				resp.Records[idx] = rdg
-			}
-			readings[i] = resp
-		}
-	}
-	log.Debugf("Returning %d readings", len(readings))
-	return readings
-}
-
 func (a *Archiver) maskTimeseriesByPermission(vk string, readings []common.Timeseries) ([]common.Timeseries, error) {
 	var (
 		ret []common.Timeseries
@@ -226,47 +206,6 @@ func (a *Archiver) maskTimeseriesByPermission(vk string, readings []common.Times
 			return common.EmptyTimeseries, err
 		}
 		newts := &common.Timeseries{
-			Generation: ts.Generation,
-			SrcURI:     uri,
-			UUID:       ts.UUID,
-		}
-		log.Infof("Got ranges (VK=%s, UUID=%s)%s", vk, ts.UUID, validRanges)
-		for _, rng := range validRanges.Ranges {
-			// find the first index of the timeseries record that is outside the lower bound
-			earlyIndex := sort.Search(ts.Len(), func(idx int) bool {
-				return ts.Records[idx].Time.Before(rng.Start)
-			})
-			// if we find no such index, then bound by our first reading
-			if earlyIndex == ts.Len() {
-				earlyIndex = 0
-			}
-			// find the first index of the timeseries record that is outside the upperbound
-			// if we find no such index, then we are bound by our last reading
-			lastIndex := sort.Search(ts.Len(), func(idx int) bool {
-				return ts.Records[idx].Time.After(rng.End)
-			})
-			newts.Records = append(newts.Records, ts.Records[earlyIndex:lastIndex]...)
-		}
-		ret = append(ret, *newts)
-	}
-	return ret, nil
-}
-
-func (a *Archiver) maskStatisticTimeseriesByPermission(vk string, readings []common.StatisticTimeseries) ([]common.StatisticTimeseries, error) {
-	var (
-		ret []common.StatisticTimeseries
-	)
-	for _, ts := range readings {
-		sort.Sort(ts)
-		uri, err := a.MD.URIFromUUID(ts.UUID)
-		if err != nil {
-			return common.EmptyStatisticTimeseries, err
-		}
-		validRanges, err := a.dotmaster.GetValidRanges(uri, vk)
-		if err != nil {
-			return common.EmptyStatisticTimeseries, err
-		}
-		newts := &common.StatisticTimeseries{
 			Generation: ts.Generation,
 			SrcURI:     uri,
 			UUID:       ts.UUID,
