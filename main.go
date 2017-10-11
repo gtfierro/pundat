@@ -22,7 +22,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "pundat"
 	app.Usage = "Archiver and data access tools for BOSSWAVE and BTrDB"
-	app.Version = "0.3.0"
+	app.Version = "0.3.1"
 
 	app.Commands = []cli.Command{
 		{
