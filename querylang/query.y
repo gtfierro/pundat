@@ -147,7 +147,7 @@ dataClause : DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv
                 if err != nil {
 				    sqlex.(*sqLex).Error(fmt.Sprintf("Could not parse integer \"%v\" (%v)", $3, err.Error()))
                 }
-				$$ = &DataQuery{Dtype: IN_TYPE, Start: $8, End: $10, Limit: $12, Timeconv: $13, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: uint64(num)}
+				$$ = &DataQuery{Dtype: IN_TYPE, Start: $8, End: $10, Limit: $12, Timeconv: $13, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: num}
 			}
 		   | STATISTICS LPAREN NUMBER RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv
 			{
@@ -155,7 +155,7 @@ dataClause : DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv
                 if err != nil {
 				    sqlex.(*sqLex).Error(fmt.Sprintf("Could not parse integer \"%v\" (%v)", $3, err.Error()))
                 }
-				$$ = &DataQuery{Dtype: IN_TYPE, Start: $8, End: $10, Limit: $12, Timeconv: $13, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: uint64(num)}
+				$$ = &DataQuery{Dtype: IN_TYPE, Start: $8, End: $10, Limit: $12, Timeconv: $13, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: num}
 			}
 		   | WINDOW LPAREN NUMBER lvalue RPAREN DATA IN LPAREN timeref COMMA timeref RPAREN limit timeconv
 			{

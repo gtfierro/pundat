@@ -3,9 +3,7 @@ package archiver
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gtfierro/giles2/common"
 	bw2 "github.com/immesys/bw2bind"
-	"math"
 	"strings"
 	"time"
 )
@@ -156,22 +154,13 @@ type Timeseries struct {
 	UUID       string    `msgpack:"uuid"`
 	Path       string    `msgpack:"path"`
 	Generation uint64    `msgpack:"generation"`
-	Times      []uint64  `msgpack:"times"`
+	Times      []int64   `msgpack:"times"`
 	Values     []float64 `msgpack:"values"`
 }
 
 func (msg Timeseries) ToMsgPackBW() (po bw2.PayloadObject) {
 	po, _ = bw2.CreateMsgPackPayloadObject(bw2.PONumGilesTimeseries, msg)
 	return
-}
-
-func (msg Timeseries) ToReadings() []common.Reading {
-	lesserLength := int(math.Min(float64(len(msg.Times)), float64(len(msg.Values))))
-	var res = make([]common.Reading, lesserLength)
-	for idx := 0; idx < lesserLength; idx++ {
-		res[idx] = &common.SmapNumberReading{Time: msg.Times[idx], Value: msg.Values[idx], UoT: common.GuessTimeUnit(msg.Times[idx])}
-	}
-	return res
 }
 
 func (msg Timeseries) Dump() string {
@@ -212,15 +201,6 @@ type Statistics struct {
 func (msg Statistics) ToMsgPackBW() (po bw2.PayloadObject) {
 	po, _ = bw2.CreateMsgPackPayloadObject(bw2.PONumGilesTimeseries, msg)
 	return
-}
-
-func (msg Statistics) ToReadings() []common.Reading {
-	lesserLength := int(math.Min(float64(len(msg.Times)), float64(len(msg.Count))))
-	var res = make([]common.Reading, lesserLength)
-	for idx := 0; idx < lesserLength; idx++ {
-		res[idx] = &common.StatisticalNumberReading{Time: msg.Times[idx], UoT: common.GuessTimeUnit(msg.Times[idx]), Count: msg.Count[idx], Min: msg.Min[idx], Max: msg.Max[idx], Mean: msg.Mean[idx]}
-	}
-	return res
 }
 
 func (msg Statistics) Dump() string {

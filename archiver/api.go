@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"github.com/gtfierro/pundat/common"
+	"github.com/gtfierro/pundat/dots"
 	"sort"
 )
 
@@ -21,8 +22,6 @@ func (a *Archiver) DistinctTag(vk string, params *common.DistinctParams) ([]stri
 	return a.MD.GetDistinct(vk, params.Tag, params.Where)
 }
 
-// selects data for the matching streams within the range given
-// by Begin/End
 func (a *Archiver) SelectDataRange(vk string, params *common.DataParams) ([]common.Timeseries, error) {
 	var (
 		err    error
@@ -31,22 +30,39 @@ func (a *Archiver) SelectDataRange(vk string, params *common.DataParams) ([]comm
 	if err = a.prepareDataParams(params); err != nil {
 		return result, err
 	}
+	result = make([]common.Timeseries, len(params.UUIDs))
 
-	// switch order so its consistent
-	if params.End < params.Begin {
-		params.Begin, params.End = params.End, params.Begin
+	// TODO: this should be a time.Time consistently throughout (params. begin, end)
+	requestedRange := dots.NewTimeRangeNano(params.Begin, params.End)
+
+	// for each of the UUIDs in the params, get the intersection of that with the
+	// valid ranges of access this VK has to that UUID.
+	for idx, uuid := range params.UUIDs {
+		uri, err := a.MD.URIFromUUID(uuid)
+		if err != nil {
+			return result, err
+		}
+		validRanges, err := a.dotmaster.GetValidRanges(uri, vk)
+		if err != nil {
+			return result, err
+		}
+		validRequestedRanges := validRanges.GetOverlap(requestedRange)
+		for _, rng := range validRequestedRanges.Ranges {
+			tsresult, err := a.TS.GetDataUUID(uuid, rng.Start.UnixNano(), rng.End.UnixNano(), params.ConvertToUnit)
+			if err != nil {
+				return result, err
+			}
+			result[idx].Extend(tsresult)
+
+			// check limit
+			if params.DataLimit > 0 && len(result[idx].Records) > params.DataLimit {
+				result[idx].Records = result[idx].Records[:params.DataLimit]
+				continue
+			}
+		}
 	}
 
-	// fetch readings
-	result, err = a.TS.GetData(params.UUIDs, params.Begin, params.End)
-	if err != nil {
-		return result, err
-	}
-
-	// convert readings into the correct unit of time
-	result = a.packResults(params, result)
-
-	return a.maskTimeseriesByPermission(vk, result)
+	return result, err
 }
 
 // selects the data point most immediately before the Start parameter for all matching streams
@@ -73,17 +89,43 @@ func (a *Archiver) SelectStatisticalData(vk string, params *common.DataParams) (
 	if err = a.prepareDataParams(params); err != nil {
 		return
 	}
-	// switch order so its consistent
-	if params.End < params.Begin {
-		params.Begin, params.End = params.End, params.Begin
+	result = make([]common.StatisticTimeseries, len(params.UUIDs))
+	requestedRange := dots.NewTimeRangeNano(params.Begin, params.End)
+
+	for idx, uuid := range params.UUIDs {
+		uri, err := a.MD.URIFromUUID(uuid)
+		if err != nil {
+			return result, err
+		}
+		validRanges, err := a.dotmaster.GetValidRanges(uri, vk)
+		if err != nil {
+			return result, err
+		}
+		validRequestedRanges := validRanges.GetOverlap(requestedRange)
+		for _, rng := range validRequestedRanges.Ranges {
+
+			var tsresult common.StatisticTimeseries
+			if params.IsStatistical {
+				tsresult, err = a.TS.StatisticalDataUUID(uuid, params.PointWidth, rng.Start.UnixNano(), rng.End.UnixNano(), params.ConvertToUnit)
+			} else if params.IsWindow {
+				tsresult, err = a.TS.WindowDataUUID(uuid, params.Width, rng.Start.UnixNano(), rng.End.UnixNano(), params.ConvertToUnit)
+			}
+			log.Debug(len(tsresult.Records))
+
+			if err != nil {
+				return result, err
+			}
+			result[idx].Extend(tsresult)
+
+			// check limit
+			if params.DataLimit > 0 && len(result[idx].Records) > params.DataLimit {
+				result[idx].Records = result[idx].Records[:params.DataLimit]
+				continue
+			}
+		}
 	}
-	if params.IsStatistical {
-		result, err = a.TS.StatisticalData(params.UUIDs, params.PointWidth, params.Begin, params.End)
-	} else if params.IsWindow {
-		result, err = a.TS.WindowData(params.UUIDs, params.Width, params.Begin, params.End)
-	}
-	result = a.packStatsResults(params, result)
-	return a.maskStatisticTimeseriesByPermission(vk, result)
+
+	return result, err
 }
 
 func (a *Archiver) GetChangedRanges(params *common.DataParams) (result []common.ChangedRange, err error) {
@@ -121,6 +163,11 @@ func (a *Archiver) prepareDataParams(params *common.DataParams) (err error) {
 			return err
 		}
 	}
+
+	// switch order so its consistent
+	if params.End < params.Begin {
+		params.Begin, params.End = params.End, params.Begin
+	}
 	return nil
 }
 
@@ -128,10 +175,6 @@ func (a *Archiver) packResults(params *common.DataParams, readings []common.Time
 	for i, resp := range readings {
 		resp.Lock()
 		if len(resp.Records) > 0 {
-			// apply data limit if exists
-			if params.DataLimit > 0 && len(resp.Records) > params.DataLimit {
-				resp.Records = resp.Records[:params.DataLimit]
-			}
 			// mark timestamps by how they should be transformed
 			for idx, rdg := range resp.Records {
 				rdg.Unit = params.ConvertToUnit

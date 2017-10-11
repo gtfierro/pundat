@@ -94,7 +94,7 @@ func (bdb *btrIface) statisticalResponseFromChan(c chan btrdb.StatisticalValue) 
 	return sr
 }
 
-func (bdb *btrIface) queryNearestValue(uuids []common.UUID, start uint64, backwards bool) ([]common.Timeseries, error) {
+func (bdb *btrIface) queryNearestValue(uuids []common.UUID, start int64, backwards bool) ([]common.Timeseries, error) {
 	var ret = make([]common.Timeseries, len(uuids))
 	var results []chan btrdb.StandardValue
 	var generations []chan uint64
@@ -102,7 +102,7 @@ func (bdb *btrIface) queryNearestValue(uuids []common.UUID, start uint64, backwa
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, reason, err := client.QueryNearestValue(uuid, int64(start), backwards, 0)
+		values, gens, reason, err := client.QueryNearestValue(uuid, start, backwards, 0)
 		results = append(results, values)
 		generations = append(generations, gens)
 		reasons = append(reasons, reason)
@@ -135,15 +135,15 @@ func (bdb *btrIface) queryNearestValue(uuids []common.UUID, start uint64, backwa
 	return ret, nil
 }
 
-func (bdb *btrIface) Prev(uuids []common.UUID, start uint64) ([]common.Timeseries, error) {
+func (bdb *btrIface) Prev(uuids []common.UUID, start int64) ([]common.Timeseries, error) {
 	return bdb.queryNearestValue(uuids, start, true)
 }
 
-func (bdb *btrIface) Next(uuids []common.UUID, start uint64) ([]common.Timeseries, error) {
+func (bdb *btrIface) Next(uuids []common.UUID, start int64) ([]common.Timeseries, error) {
 	return bdb.queryNearestValue(uuids, start, false)
 }
 
-func (bdb *btrIface) GetData(uuids []common.UUID, start, end uint64) ([]common.Timeseries, error) {
+func (bdb *btrIface) GetData(uuids []common.UUID, start, end int64) ([]common.Timeseries, error) {
 	var ret = make([]common.Timeseries, len(uuids))
 	var results []chan btrdb.StandardValue
 	var generations []chan uint64
@@ -151,7 +151,7 @@ func (bdb *btrIface) GetData(uuids []common.UUID, start, end uint64) ([]common.T
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, reason, err := client.QueryStandardValues(uuid, int64(start), int64(end), 0)
+		values, gens, reason, err := client.QueryStandardValues(uuid, start, end, 0)
 		results = append(results, values)
 		generations = append(generations, gens)
 		reasons = append(reasons, reason)
@@ -184,7 +184,7 @@ func (bdb *btrIface) GetData(uuids []common.UUID, start, end uint64) ([]common.T
 	return ret, nil
 }
 
-func (bdb *btrIface) StatisticalData(uuids []common.UUID, pointWidth int, start, end uint64) ([]common.StatisticTimeseries, error) {
+func (bdb *btrIface) StatisticalData(uuids []common.UUID, pointWidth int, start, end int64) ([]common.StatisticTimeseries, error) {
 	var ret = make([]common.StatisticTimeseries, len(uuids))
 	var results []chan btrdb.StatisticalValue
 	var generations []chan uint64
@@ -192,7 +192,7 @@ func (bdb *btrIface) StatisticalData(uuids []common.UUID, pointWidth int, start,
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, reason, err := client.QueryStatisticalValues(uuid, int64(start), int64(end), uint8(pointWidth), 0)
+		values, gens, reason, err := client.QueryStatisticalValues(uuid, start, end, uint8(pointWidth), 0)
 		results = append(results, values)
 		generations = append(generations, gens)
 		reasons = append(reasons, reason)
@@ -225,7 +225,7 @@ func (bdb *btrIface) StatisticalData(uuids []common.UUID, pointWidth int, start,
 	return ret, nil
 }
 
-func (bdb *btrIface) WindowData(uuids []common.UUID, width, start, end uint64) ([]common.StatisticTimeseries, error) {
+func (bdb *btrIface) WindowData(uuids []common.UUID, width uint64, start, end int64) ([]common.StatisticTimeseries, error) {
 	var ret = make([]common.StatisticTimeseries, len(uuids))
 	var results []chan btrdb.StatisticalValue
 	var generations []chan uint64
@@ -233,7 +233,7 @@ func (bdb *btrIface) WindowData(uuids []common.UUID, width, start, end uint64) (
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		values, gens, reason, err := client.QueryWindowValues(uuid, int64(start), int64(end), width, 0, 0)
+		values, gens, reason, err := client.QueryWindowValues(uuid, start, end, width, 0, 0)
 		results = append(results, values)
 		generations = append(generations, gens)
 		reasons = append(reasons, reason)
@@ -316,18 +316,18 @@ func (bdb *btrIface) ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64,
 	return ret, nil
 }
 
-func (bdb *btrIface) DeleteData(uuids []common.UUID, start uint64, end uint64) error {
+func (bdb *btrIface) DeleteData(uuids []common.UUID, start int64, end int64) error {
 	client := bdb.getClient()
 	for _, uu := range uuids {
 		uuid := uuidlib.UUID(uu)
-		if _, err := client.DeleteValues(uuid, int64(start), int64(end)); err != nil {
+		if _, err := client.DeleteValues(uuid, start, end); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (bdb *btrIface) ValidTimestamp(time uint64, uot common.UnitOfTime) bool {
+func (bdb *btrIface) ValidTimestamp(time int64, uot common.UnitOfTime) bool {
 	var err error
 	if uot != common.UOT_NS {
 		time, err = common.ConvertTime(time, uot, common.UOT_NS)

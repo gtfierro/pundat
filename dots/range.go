@@ -23,6 +23,13 @@ func NewTimeRange(start, end time.Time) *TimeRange {
 	}
 }
 
+func NewTimeRangeNano(start, end int64) *TimeRange {
+	return &TimeRange{
+		Start: time.Unix(0, start),
+		End:   time.Unix(0, end),
+	}
+}
+
 // returns true if the two time ranges do not overlap
 // if false, then they must overlap
 func (rng *TimeRange) IsDisjoint(rng2 *TimeRange) bool {
@@ -37,6 +44,19 @@ func (rng *TimeRange) MergeFrom(rng2 *TimeRange) {
 		rng.Start = rng2.Start
 	}
 	if rng.End.Before(rng2.End) {
+		rng.End = rng2.End
+	}
+}
+
+func (rng *TimeRange) Intersect(rng2 *TimeRange) {
+	if rng.IsDisjoint(rng2) {
+		rng = nil
+		return // no intersection!
+	}
+	if rng.Start.Before(rng2.Start) {
+		rng.Start = rng2.Start
+	}
+	if rng.End.After(rng2.End) {
 		rng.End = rng2.End
 	}
 }
@@ -77,6 +97,17 @@ func (dj *DisjointRanges) String() string {
 	}
 	res += fmt.Sprintln("┗")
 	return res
+}
+
+func (dj *DisjointRanges) GetOverlap(rng *TimeRange) *DisjointRanges {
+	newdj := new(DisjointRanges)
+	for _, oldrange := range dj.Ranges {
+		if !rng.IsDisjoint(oldrange) {
+			rng.Intersect(oldrange)
+			newdj.Merge(rng)
+		}
+	}
+	return newdj
 }
 
 // takes the intersection of creation/expiry times of all DOTs on the chain

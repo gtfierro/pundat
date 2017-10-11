@@ -841,7 +841,7 @@ sqdefault:
 			if err != nil {
 				sqlex.(*sqLex).Error(fmt.Sprintf("Could not parse integer \"%v\" (%v)", sqDollar[3].str, err.Error()))
 			}
-			sqVAL.data = &DataQuery{Dtype: IN_TYPE, Start: sqDollar[8].time, End: sqDollar[10].time, Limit: sqDollar[12].limit, Timeconv: sqDollar[13].timeconv, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: uint64(num)}
+			sqVAL.data = &DataQuery{Dtype: IN_TYPE, Start: sqDollar[8].time, End: sqDollar[10].time, Limit: sqDollar[12].limit, Timeconv: sqDollar[13].timeconv, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: num}
 		}
 	case 18:
 		sqDollar = sqS[sqpt-13 : sqpt+1]
@@ -851,7 +851,7 @@ sqdefault:
 			if err != nil {
 				sqlex.(*sqLex).Error(fmt.Sprintf("Could not parse integer \"%v\" (%v)", sqDollar[3].str, err.Error()))
 			}
-			sqVAL.data = &DataQuery{Dtype: IN_TYPE, Start: sqDollar[8].time, End: sqDollar[10].time, Limit: sqDollar[12].limit, Timeconv: sqDollar[13].timeconv, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: uint64(num)}
+			sqVAL.data = &DataQuery{Dtype: IN_TYPE, Start: sqDollar[8].time, End: sqDollar[10].time, Limit: sqDollar[12].limit, Timeconv: sqDollar[13].timeconv, IsStatistical: true, IsWindow: false, IsChangedRanges: false, PointWidth: num}
 		}
 	case 19:
 		sqDollar = sqS[sqpt-14 : sqpt+1]

@@ -10,13 +10,13 @@ import (
 
 // we use 1/1/2150 as the "upper bound" for guessing timestamps
 const (
-	S_HIGH  uint64 = 5680281600
-	MS_HIGH uint64 = 5680281600000
-	US_HIGH uint64 = 5680281600000000
-	NS_HIGH uint64 = 5680281600000000000
+	S_HIGH  int64 = 5680281600
+	MS_HIGH int64 = 5680281600000
+	US_HIGH int64 = 5680281600000000
+	NS_HIGH int64 = 5680281600000000000
 )
 
-func GuessTimeUnit(val uint64) UnitOfTime {
+func GuessTimeUnit(val int64) UnitOfTime {
 	if val < S_HIGH {
 		return UOT_S
 	} else if val < MS_HIGH {
@@ -58,7 +58,7 @@ const (
 	UOT_S UnitOfTime = 4
 )
 
-var unitmultiplier = map[UnitOfTime]uint64{
+var unitmultiplier = map[UnitOfTime]int64{
 	UOT_NS: 1000000000,
 	UOT_US: 1000000,
 	UOT_MS: 1000,
@@ -67,18 +67,18 @@ var unitmultiplier = map[UnitOfTime]uint64{
 
 // Takes a timestamp with accompanying unit of time 'stream_uot' and
 // converts it to the unit of time 'target_uot'
-func ConvertTime(time uint64, stream_uot, target_uot UnitOfTime) (uint64, error) {
-	var returnTime uint64
+func ConvertTime(time int64, stream_uot, target_uot UnitOfTime) (int64, error) {
+	var returnTime int64
 	if stream_uot == target_uot {
 		return time, nil
 	}
-	if target_uot < stream_uot { // target/stream is > 1, so we can use uint64
+	if target_uot < stream_uot { // target/stream is > 1, so we can use int64
 		returnTime = time * (unitmultiplier[target_uot] / unitmultiplier[stream_uot])
 		if returnTime < time {
 			return time, TimeConvertErr
 		}
 	} else {
-		returnTime = time / uint64(unitmultiplier[stream_uot]/unitmultiplier[target_uot])
+		returnTime = time / (unitmultiplier[stream_uot] / unitmultiplier[target_uot])
 		if returnTime > time {
 			return time, TimeConvertErr
 		}
@@ -87,16 +87,16 @@ func ConvertTime(time uint64, stream_uot, target_uot UnitOfTime) (uint64, error)
 }
 
 // interprets the time as the given unit and returns that
-func TimeAsUnit(t time.Time, unit UnitOfTime) uint64 {
+func TimeAsUnit(t time.Time, unit UnitOfTime) int64 {
 	switch unit {
 	case UOT_S:
-		return uint64(t.Unix())
+		return t.Unix()
 	case UOT_MS:
-		return uint64(t.UnixNano() / 1000000)
+		return t.UnixNano() / 1000000
 	case UOT_US:
-		return uint64(t.UnixNano() / 1000)
+		return t.UnixNano() / 1000
 	case UOT_NS:
-		return uint64(t.UnixNano())
+		return t.UnixNano()
 	}
 	return 0
 }
@@ -151,7 +151,7 @@ func (u *UnitOfTime) UnmarshalJSON(b []byte) (err error) {
 func ParseAbsTime(num, units string) (time.Time, error) {
 	var d time.Time
 	var err error
-	i, err := strconv.ParseUint(num, 10, 64)
+	i, err := strconv.ParseInt(num, 10, 64)
 	if err != nil {
 		return d, err
 	}
@@ -214,18 +214,18 @@ func AddDurations(d1, d2 time.Duration) time.Duration {
 
 // Takes a timestamp with accompanying unit of time 'stream_uot' and
 // converts it to the unit of time 'target_uot'
-func convertTime(time uint64, stream_uot, target_uot UnitOfTime) (uint64, error) {
-	var returnTime uint64
+func convertTime(time int64, stream_uot, target_uot UnitOfTime) (int64, error) {
+	var returnTime int64
 	if stream_uot == target_uot {
 		return time, nil
 	}
-	if target_uot < stream_uot { // target/stream is > 1, so we can use uint64
+	if target_uot < stream_uot { // target/stream is > 1, so we can use int64
 		returnTime = time * (unitmultiplier[target_uot] / unitmultiplier[stream_uot])
 		if returnTime < time {
 			return time, TimeConvertErr
 		}
 	} else {
-		returnTime = time / uint64(unitmultiplier[stream_uot]/unitmultiplier[target_uot])
+		returnTime = time / (unitmultiplier[stream_uot] / unitmultiplier[target_uot])
 		if returnTime > time {
 			return time, TimeConvertErr
 		}

@@ -251,7 +251,7 @@ func (s *Stream) getTime(thing interface{}) time.Time {
 		return parsedTime
 	}
 
-	timeNum, ok := timeThing.(uint64)
+	timeNum, ok := timeThing.(int64)
 	if ok {
 		uot := common.GuessTimeUnit(timeNum)
 		i_ns, err := common.ConvertTime(timeNum, uot, common.UOT_NS)

@@ -85,8 +85,8 @@ func (parsed *ParsedQuery) GetParams() common.QueryParams {
 		} else {
 			return &common.DataParams{
 				Where:         parsed.Where,
-				Begin:         uint64(parsed.Data.Start.UnixNano()),
-				End:           uint64(parsed.Data.End.UnixNano()),
+				Begin:         parsed.Data.Start.UnixNano(),
+				End:           parsed.Data.End.UnixNano(),
 				IsStatistical: false,
 				IsWindow:      false,
 			}
@@ -96,8 +96,8 @@ func (parsed *ParsedQuery) GetParams() common.QueryParams {
 			Where:           parsed.Where,
 			StreamLimit:     int(parsed.Data.Limit.Streamlimit),
 			DataLimit:       int(parsed.Data.Limit.Limit),
-			Begin:           uint64(parsed.Data.Start.UnixNano()),
-			End:             uint64(parsed.Data.End.UnixNano()),
+			Begin:           parsed.Data.Start.UnixNano(),
+			End:             parsed.Data.End.UnixNano(),
 			ConvertToUnit:   parsed.Data.Timeconv,
 			IsStatistical:   parsed.Data.IsStatistical,
 			IsWindow:        parsed.Data.IsWindow,

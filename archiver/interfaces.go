@@ -31,29 +31,32 @@ type TimeseriesStore interface {
 
 	// list of UUIDs, reference time in nanoseconds
 	// Retrieves data before the reference time for the given streams.
-	Prev([]common.UUID, uint64) ([]common.Timeseries, error)
+	Prev([]common.UUID, int64) ([]common.Timeseries, error)
 
 	// list of UUIDs, reference time in nanoseconds
 	// Retrieves data after the reference time for the given streams.
-	Next([]common.UUID, uint64) ([]common.Timeseries, error)
+	Next([]common.UUID, int64) ([]common.Timeseries, error)
 
 	// uuids, start time, end time (both in nanoseconds)
-	GetData(uuids []common.UUID, start uint64, end uint64) ([]common.Timeseries, error)
+	GetData(uuids []common.UUID, start int64, end int64) ([]common.Timeseries, error)
+	GetDataUUID(uuid common.UUID, start int64, end int64, convert common.UnitOfTime) (common.Timeseries, error)
 
 	// pointWidth is the log of the number of records to aggregate
-	StatisticalData(uuids []common.UUID, pointWidth int, start, end uint64) ([]common.StatisticTimeseries, error)
+	StatisticalData(uuids []common.UUID, pointWidth int, start, end int64) ([]common.StatisticTimeseries, error)
+	StatisticalDataUUID(uuid common.UUID, pointWidth int, start, end int64, convert common.UnitOfTime) (common.StatisticTimeseries, error)
 
 	// width in nanoseconds
-	WindowData(uuids []common.UUID, width, start, end uint64) ([]common.StatisticTimeseries, error)
+	WindowData(uuids []common.UUID, width uint64, start, end int64) ([]common.StatisticTimeseries, error)
+	WindowDataUUID(uuid common.UUID, width uint64, start, end int64, convert common.UnitOfTime) (common.StatisticTimeseries, error)
 
 	// https://godoc.org/gopkg.in/btrdb.v3#BTrDBConnection.QueryChangedRanges
 	ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64, resolution uint8) ([]common.ChangedRange, error)
 
 	// delete data
-	DeleteData(uuids []common.UUID, start uint64, end uint64) error
+	DeleteData(uuids []common.UUID, start int64, end int64) error
 
 	// returns true if the timestamp can be represented in the database
-	ValidTimestamp(uint64, common.UnitOfTime) bool
+	ValidTimestamp(int64, common.UnitOfTime) bool
 
 	AddAnnotations(uuid common.UUID, annotations map[string]interface{}) error
 

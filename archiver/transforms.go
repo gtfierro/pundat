@@ -37,7 +37,7 @@ func POsFromTimeseriesGroup(nonce uint32, tsGroups []common.Timeseries, statsGro
 			UUID:       group.UUID.String(),
 			Path:       group.SrcURI,
 			Generation: group.Generation,
-			Times:      []uint64{},
+			Times:      []int64{},
 			Values:     []float64{},
 		}
 		for _, rdg := range group.Records {
@@ -57,7 +57,7 @@ func POsFromTimeseriesGroup(nonce uint32, tsGroups []common.Timeseries, statsGro
 			Max:        []float64{},
 		}
 		for _, rdg := range group.Records {
-			ts.Times = append(ts.Times, common.TimeAsUnit(rdg.Time, rdg.Unit))
+			ts.Times = append(ts.Times, uint64(common.TimeAsUnit(rdg.Time, rdg.Unit)))
 			ts.Count = append(ts.Count, rdg.Count)
 			ts.Min = append(ts.Min, rdg.Min)
 			ts.Mean = append(ts.Mean, rdg.Mean)

@@ -50,9 +50,9 @@ type DataParams struct {
 	// Defaults to the most recent
 	DataLimit int
 	// time to start fetching data from (inclusive)
-	Begin uint64
+	Begin int64
 	// time to stop fetching data from (inclusive)
-	End uint64
+	End int64
 	// converts all readings to this unit of time when finished
 	ConvertToUnit UnitOfTime
 	// if true, then we interpret pointwidth

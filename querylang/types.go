@@ -18,7 +18,7 @@ type DataQuery struct {
 	ToGen           uint64
 	Resolution      uint8
 	Width           uint64
-	PointWidth      uint64
+	PointWidth      int64
 }
 
 type Limit struct {

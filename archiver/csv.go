@@ -77,7 +77,7 @@ func (cdb *CSVDB) StreamExists(uuid common.UUID) (bool, error) {
 // registers the stream with the timeseries database
 func (cdb *CSVDB) RegisterStream(uuid common.UUID, uri, name, unit string) error {
 	filename := fmt.Sprintf("data/%s.csv", uuid.String())
-	log.Debug(filename)
+	log.Info("Registering CSV file for", filename)
 	f, ferr := os.Create(filename)
 	if ferr != nil {
 		return ferr

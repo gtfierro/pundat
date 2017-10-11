@@ -1,6 +1,7 @@
 package common
 
 import (
+	uuid "github.com/pborman/uuid"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"sync"
 	"time"
@@ -62,6 +63,24 @@ func (ts *Timeseries) AddRecord(rec *TimeseriesReading) {
 	ts.Unlock()
 }
 
+func (ts *Timeseries) Extend(newts Timeseries) {
+	ts.Lock()
+	if len(ts.UUID) == 0 {
+		ts.UUID = newts.UUID
+	}
+	if !uuid.Equal(uuid.UUID(ts.UUID), uuid.UUID(newts.UUID)) {
+		ts.Unlock()
+		return
+	}
+
+	ts.Records = append(ts.Records, newts.Records...)
+	if newts.Generation > ts.Generation {
+		ts.Generation = newts.Generation
+	}
+
+	ts.Unlock()
+}
+
 func (ts *Timeseries) NumReadings() int {
 	ts.RLock()
 	defer ts.RUnlock()
@@ -79,6 +98,24 @@ type StatisticTimeseries struct {
 func (ts *StatisticTimeseries) AddRecord(rec *StatisticsReading) {
 	ts.Lock()
 	ts.Records = append(ts.Records, rec)
+	ts.Unlock()
+}
+
+func (ts *StatisticTimeseries) Extend(newts StatisticTimeseries) {
+	ts.Lock()
+	if len(ts.UUID) == 0 {
+		ts.UUID = newts.UUID
+	}
+	if !uuid.Equal(uuid.UUID(ts.UUID), uuid.UUID(newts.UUID)) {
+		ts.Unlock()
+		return
+	}
+
+	ts.Records = append(ts.Records, newts.Records...)
+	if newts.Generation > ts.Generation {
+		ts.Generation = newts.Generation
+	}
+
 	ts.Unlock()
 }
 
