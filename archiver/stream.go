@@ -260,6 +260,17 @@ func (s *Stream) getTime(thing interface{}) time.Time {
 		}
 		return time.Unix(0, int64(i_ns))
 	}
+
+	timeNumuint, ok := timeThing.(uint64)
+	if ok {
+		uot := common.GuessTimeUnit(int64(timeNumuint))
+		i_ns, err := common.ConvertTime(int64(timeNumuint), uot, common.UOT_NS)
+		if err != nil {
+			log.Error(err)
+		}
+		return time.Unix(0, int64(i_ns))
+	}
+
 	timeFloat, ok := timeThing.(float64)
 	if ok {
 		uot := common.GuessTimeUnit(int64(timeFloat))
