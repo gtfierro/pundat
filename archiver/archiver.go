@@ -82,6 +82,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	a.MD = newMongoStore(&mongoConfig{address: mongoaddr, collectionPrefix: c.Metadata.CollectionPrefix})
 
 	a.TS = newBTrDBv4(&btrdbv4Config{addresses: []string{c.BtrDB.Address}})
+	//a.TS = NewCSVDB()
 
 	// setup bosswave
 	a.bw = bw2.ConnectOrExit(c.BOSSWAVE.Address)

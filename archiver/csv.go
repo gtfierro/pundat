@@ -116,29 +116,35 @@ func (cdb *CSVDB) AddReadings(ts common.Timeseries) error {
 
 // list of UUIDs, reference time in nanoseconds
 // Retrieves data before the reference time for the given streams.
-func (cdb *CSVDB) Prev([]common.UUID, uint64) ([]common.Timeseries, error) {
+func (cdb *CSVDB) Prev([]common.UUID, int64) ([]common.Timeseries, error) {
 	return []common.Timeseries{}, nil
 }
 
 // list of UUIDs, reference time in nanoseconds
 // Retrieves data after the reference time for the given streams.
-func (cdb *CSVDB) Next([]common.UUID, uint64) ([]common.Timeseries, error) {
+func (cdb *CSVDB) Next([]common.UUID, int64) ([]common.Timeseries, error) {
 	return []common.Timeseries{}, nil
 }
 
 // uuids, start time, end time (both in nanoseconds)
-func (cdb *CSVDB) GetData(uuids []common.UUID, start uint64, end uint64) ([]common.Timeseries, error) {
+func (cdb *CSVDB) GetData(uuids []common.UUID, start int64, end int64) ([]common.Timeseries, error) {
 	return []common.Timeseries{}, nil
 }
 
 // pointWidth is the log of the number of records to aggregate
-func (cdb *CSVDB) StatisticalData(uuids []common.UUID, pointWidth int, start, end uint64) ([]common.StatisticTimeseries, error) {
+func (cdb *CSVDB) StatisticalData(uuids []common.UUID, pointWidth int, start, end int64) ([]common.StatisticTimeseries, error) {
 	return []common.StatisticTimeseries{}, nil
+}
+func (cdb *CSVDB) StatisticalDataUUID(uuid common.UUID, pointWidth int, start, end int64, convert common.UnitOfTime) (common.StatisticTimeseries, error) {
+	return common.StatisticTimeseries{}, nil
 }
 
 // width in nanoseconds
-func (cdb *CSVDB) WindowData(uuids []common.UUID, width, start, end uint64) ([]common.StatisticTimeseries, error) {
+func (cdb *CSVDB) WindowData(uuids []common.UUID, width uint64, start, end int64) ([]common.StatisticTimeseries, error) {
 	return []common.StatisticTimeseries{}, nil
+}
+func (cdb *CSVDB) WindowDataUUID(uuid common.UUID, width uint64, start, end int64, convert common.UnitOfTime) (common.StatisticTimeseries, error) {
+	return common.StatisticTimeseries{}, nil
 }
 
 // https://godoc.org/gopkg.in/btrdb.v3#BTrDBConnection.QueryChangedRanges
@@ -147,12 +153,12 @@ func (cdb *CSVDB) ChangedRanges(uuids []common.UUID, from_gen, to_gen uint64, re
 }
 
 // delete data
-func (cdb *CSVDB) DeleteData(uuids []common.UUID, start uint64, end uint64) error {
+func (cdb *CSVDB) DeleteData(uuids []common.UUID, start int64, end int64) error {
 	return nil
 }
 
 // returns true if the timestamp can be represented in the database
-func (cdb *CSVDB) ValidTimestamp(uint64, common.UnitOfTime) bool {
+func (cdb *CSVDB) ValidTimestamp(int64, common.UnitOfTime) bool {
 	return true
 }
 
@@ -172,4 +178,8 @@ func (cdb *CSVDB) Disconnect() error {
 		}
 	}
 	return err
+}
+
+func (cdb *CSVDB) GetDataUUID(uuid common.UUID, start int64, end int64, convert common.UnitOfTime) (common.Timeseries, error) {
+	return common.Timeseries{}, nil
 }
