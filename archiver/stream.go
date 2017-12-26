@@ -15,7 +15,7 @@ import (
 )
 
 var commitTick = 60 * time.Second
-var jitter = 30 // second
+var jitter = 60 // second
 var commitCount = 512
 var annotationTick = 5 * time.Minute
 
