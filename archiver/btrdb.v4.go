@@ -13,7 +13,7 @@ import (
 	"gopkg.in/btrdb.v4"
 )
 
-var timeout = time.Second * 30
+var timeout = time.Second * 20
 
 var errStreamNotExist = errors.New("Stream does not exist")
 
@@ -147,9 +147,8 @@ func (bdb *btrdbv4Iface) AddReadings(readings common.Timeseries) error {
 	if err != nil {
 		return errors.Wrap(err, "AddReadings: could not get stream")
 	}
+
 	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 	timefunc := func(i int) int64 {
 		return readings.Records[i].Time.UnixNano()
 	}
