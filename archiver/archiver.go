@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -67,6 +70,10 @@ func NewArchiver(c *Config) (a *Archiver) {
 		defer profile.Start(profile.BlockProfile, profile.ProfilePath(".")).Stop()
 	}
 
+	go func() {
+		log.Fatal(http.ListenAndServe("localhost:6064", nil))
+	}()
+
 	// setup metadata
 	mongoaddr, err := net.ResolveTCPAddr("tcp4", c.Metadata.Address)
 	if err != nil {
@@ -114,7 +121,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 func (a *Archiver) Serve() {
 	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		sig := <-sigs
 		log.Info("GOT SIGNAL-->", sig)
@@ -122,12 +129,13 @@ func (a *Archiver) Serve() {
 	}()
 	for _, namespace := range a.config.BOSSWAVE.ListenNS {
 		go a.vm.subscribeNamespace(ctx, namespace)
+		time.Sleep(10 * time.Second)
 	}
 
 	<-a.stop
 
-	a.TS.Disconnect()
 	cancel()
+	a.TS.Disconnect()
 }
 
 func (a *Archiver) Stop() {
