@@ -16,6 +16,7 @@ run: build
 		./${APP}
 
 container: build
+	cp pundat container
 	docker build -t gtfierro/$(APP):$(RELEASE) container
 	docker build -t gtfierro/$(APP):latest container
 
@@ -31,14 +32,3 @@ containerRun: container
 			   -e BW2_AGENT=$(BW2_AGENT) -e BW2_DEFAULT_ENTITY=$(BW2_DEFAULT_ENTITY) \
 			   --rm \
 			   gtfierro/$(APP):$(RELEASE)
-
-minikube:
-	for t in kubernetes/deployment.yaml kubernetes/ingress.yaml kubernetes/service.yaml; do \
-        cat $$t | \
-        	sed -E "s/\{\{(\s*)\.Release(\s*)\}\}/$(RELEASE)/g" | \
-        	sed -E "s/\{\{(\s*)\.ServiceName(\s*)\}\}/$(APP)/g"; \
-        echo ---; \
-    done > tmp.yaml
-	kubectl apply -f tmp.yaml
-	#kubectl create -f kubernetes/pod.yaml
-
