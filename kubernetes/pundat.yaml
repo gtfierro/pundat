@@ -1,0 +1,49 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+    name: pundat
+    labels:
+        app: pundat
+spec:
+    serviceName: "pundat"
+    replicas: 1
+    selector:
+        matchLabels:
+            app: pundat
+    template:
+        metadata:
+            labels:
+                app: pundat
+        spec:
+            containers:
+                - name: pundat
+                  image:  gtfierro/pundat:latest
+                  imagePullPolicy: Always
+                  env:
+                    - name: BTRDB_SERVER
+                      value: 10.106.37.66:4410
+                    - name: MONGO_SERVER
+                      value: localhost:27017
+                    - name: GILES_BW_ENTITY
+                      value: /etc/pundat/corbusier_archiver.ent
+                    - name: GILES_BW_NAMESPACE
+                      value: ucberkeley
+                    - name: GILES_BW_ADDRESS
+                      value: 172.17.0.1:28589
+                    - name: COLLECTION_PREFIX
+                      value: pundat
+                    - name: GILES_BW_LISTEN
+                      value: "space separated list of namespaces" 
+                  volumeMounts:
+                    - name: pundat
+                      mountPath: /etc/pundat
+                  ports:
+                - name: pundat-mongo
+                  image: mongo:latest
+                  imagePullPolicy: Always
+                  ports:
+                    - containerPort: 27017
+            volumes:
+                - name: pundat
+                  hostPath:
+                    path: /etc/durandal
