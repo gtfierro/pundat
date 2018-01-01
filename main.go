@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gtfierro/pundat/version"
 	"github.com/op/go-logging"
 	"github.com/urfave/cli"
 	"os"
@@ -22,7 +23,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "pundat"
 	app.Usage = "Archiver and data access tools for BOSSWAVE and BTrDB"
-	app.Version = "0.3.1"
+	app.Version = version.Release
 
 	app.Commands = []cli.Command{
 		{

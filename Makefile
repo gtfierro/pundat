@@ -1,5 +1,5 @@
 APP?=pundat
-RELEASE?=0.3.2
+RELEASE?=0.3.3
 COMMIT?=$(shell git rev-parse --short HEAD)
 PROJECT?=github.com/gtfierro/pundat
 PERSISTDIR?=/etc/pundat
@@ -12,6 +12,11 @@ build: clean
 		-ldflags "-s -w -X ${PROJECT}/version.Release=${RELEASE} \
 						-X ${PROJECT}/version.Commit=${COMMIT}" \
 						-o ${APP}
+
+install: clean
+	go install \
+		-ldflags "-s -w -X ${PROJECT}/version.Release=${RELEASE} \
+						-X ${PROJECT}/version.Commit=${COMMIT}"
 run: build
 		./${APP}
 

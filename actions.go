@@ -14,6 +14,7 @@ import (
 	"github.com/gtfierro/pundat/archiver"
 	"github.com/gtfierro/pundat/client"
 	"github.com/gtfierro/pundat/dots"
+	"github.com/gtfierro/pundat/version"
 
 	"github.com/immesys/bw2/objects"
 	"github.com/immesys/bw2/util"
@@ -23,6 +24,10 @@ import (
 	"github.com/urfave/cli"
 	"gopkg.in/readline.v1"
 )
+
+func init() {
+	fmt.Println(version.LOGO)
+}
 
 func resolveKey(client *bw2.BW2Client, key string) (string, error) {
 	if _, err := os.Stat(key); err != nil && !os.IsNotExist(err) {
