@@ -13,7 +13,7 @@ import (
 	"gopkg.in/btrdb.v4"
 )
 
-var timeout = time.Second * 20
+var timeout = time.Second * 60
 
 var errStreamNotExist = errors.New("Stream does not exist")
 
@@ -36,7 +36,8 @@ func newBTrDBv4(c *btrdbv4Config) *btrdbv4Iface {
 	log.Noticef("Connecting to BtrDBv4 at addresses %v...", b.addresses)
 	conn, err := btrdb.Connect(context.Background(), b.addresses...)
 	if err != nil {
-		log.Fatalf("Could not connect to btrdbv4: %v", err)
+		log.Warningf("Could not connect to btrdbv4: %v", err)
+		return nil
 	}
 	b.conn = conn
 	log.Notice("Connected to BtrDB!")

@@ -80,20 +80,20 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 			ts := s.timeseries[msg.URI]
 			s.RUnlock()
 
-			ts.Lock()
+			commitme := ts.Copy()
 			// if no readings, then we give up
-			if len(ts.Records) == 0 {
-				ts.Unlock()
+			if len(commitme.Records) == 0 {
 				continue
 			}
 			// now we can assume the stream exists and can write to it
-			if err := timeseriesStore.AddReadings(ts); err != nil {
-				log.Error(errors.Wrap(err, "Could not write timeseries reading (probably deadline exceeded)"), len(ts.Records))
-				ts.Unlock()
+			if err := timeseriesStore.AddReadings(commitme); err != nil {
+				log.Error(errors.Wrap(err, "Could not write timeseries reading (probably deadline exceeded)"), len(commitme.Records))
 				continue
 			}
-			ts.Records = []*common.TimeseriesReading{}
+			ts.Lock()
+			ts.Records = ts.Records[len(commitme.Records):]
 			ts.Unlock()
+
 			s.Lock()
 			s.timeseries[msg.URI] = ts
 			s.Unlock()
@@ -219,16 +219,17 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 				ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
 				ts.Unlock()
 			}
-			ts.Lock()
-			if len(ts.Records) > commitCount {
-				// now we can assume the stream exists and can write to it
-				if err := timeseriesStore.AddReadings(ts); err != nil {
-					log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
-				} else {
-					ts.Records = []*common.TimeseriesReading{}
-				}
-			}
-			ts.Unlock()
+			//ts.Lock()
+			//if len(ts.Records) > commitCount {
+			//	// now we can assume the stream exists and can write to it
+			//	if err := timeseriesStore.AddReadings(ts); err != nil {
+			//		//TODO: when server is degraded, need to reconnect?
+			//		log.Error(errors.Wrapf(err, "Could not write timeseries reading %+v", ts))
+			//	} else {
+			//		ts.Records = []*common.TimeseriesReading{}
+			//	}
+			//}
+			//ts.Unlock()
 			s.Lock()
 			s.timeseries[msg.URI] = ts
 			s.Unlock()

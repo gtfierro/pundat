@@ -44,6 +44,19 @@ type Timeseries struct {
 	UUID       UUID
 }
 
+func (ts Timeseries) Copy() Timeseries {
+	ts.Lock()
+	newts := Timeseries{
+		Generation: ts.Generation,
+		SrcURI:     ts.SrcURI,
+		UUID:       ts.UUID,
+		Records:    make([]*TimeseriesReading, len(ts.Records)),
+	}
+	copy(newts.Records, ts.Records)
+	ts.Unlock()
+	return newts
+}
+
 // sort by timestamp
 func (ts Timeseries) Len() int {
 	return len(ts.Records)

@@ -130,7 +130,7 @@ func (a *Archiver) Serve() {
 	}()
 	for _, namespace := range a.config.BOSSWAVE.ListenNS {
 		go a.vm.subscribeNamespace(ctx, namespace)
-		time.Sleep(10 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 
 	<-a.stop
