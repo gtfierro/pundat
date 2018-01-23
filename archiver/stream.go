@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gtfierro/ob"
@@ -42,6 +43,7 @@ type Stream struct {
 }
 
 func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore MetadataStore, msg *bw2.SimpleMessage) error {
+	atomic.AddInt64(&currentStreams, 1)
 	// don't need to worry about escaping $ in the URI because bosswave doesn't allow it
 	rewrittenURI := s.urimatch.ReplaceAllString(msg.URI, s.urireplace)
 
@@ -124,7 +126,7 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 	}()
 
 	// loop through the buffer
-	go func() {
+	readPoints := func() {
 		for msg := range s.buffer {
 			if len(msg.POs) == 0 {
 				continue
@@ -151,7 +153,11 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 			// unpack the message
 			//TODO: cannot assume msgpack
 			var thing interface{}
-			err := po.(bw2.MsgPackPayloadObject).ValueInto(&thing)
+			msgpackthing, ok := po.(bw2.MsgPackPayloadObject)
+			if !ok {
+				continue
+			}
+			err := msgpackthing.ValueInto(&thing)
 			if err != nil {
 				log.Error(errors.Wrap(err, "Could not unmarshal msgpack object"))
 				continue
@@ -235,7 +241,16 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 			s.Unlock()
 
 		}
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Info("Recovered panic in stream", s.subscribeURI, r)
+			go readPoints()
+		}
 	}()
+
+	go readPoints()
 }
 
 func (s *Stream) getTime(thing interface{}) time.Time {

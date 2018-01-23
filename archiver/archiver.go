@@ -73,6 +73,14 @@ func NewArchiver(c *Config) (a *Archiver) {
 	go func() {
 		log.Fatal(http.ListenAndServe("localhost:6064", nil))
 	}()
+	go func() {
+		for _ = range time.Tick(10 * time.Second) {
+			_active_streams := atomic.LoadInt64(&currentStreams)
+			_completed := atomic.SwapInt64(&completedWrites, 0)
+			_pending := atomic.LoadInt64(&currentWrites)
+			log.Infof("active=%d completed=%d pending=%d", _active_streams, _completed, _pending)
+		}
+	}()
 
 	// setup metadata
 	mongoaddr, err := net.ResolveTCPAddr("tcp4", c.Metadata.Address)

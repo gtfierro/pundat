@@ -78,7 +78,6 @@ func getArchiverAlive(msg *bw2.SimpleMessage) (string, time.Time, error) {
 	if err := po.(bw2.MsgPackPayloadObject).ValueInto(&md); err != nil {
 		log.Error(errors.Wrap(err, "Could not decode lastalive time"))
 	} else {
-		//2016-09-16 10:41:40.818797445 -0700 PDT
 		lastalive, err = time.Parse(time.RFC3339, md["val"].(string))
 		if err != nil {
 			log.Error(errors.Wrap(err, "Could not decode lastalive time"))

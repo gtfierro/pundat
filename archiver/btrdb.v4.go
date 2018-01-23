@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gtfierro/pundat/common"
@@ -16,6 +17,9 @@ import (
 var timeout = time.Second * 60
 
 var errStreamNotExist = errors.New("Stream does not exist")
+
+var currentWrites int64 = 0
+var completedWrites int64 = 0
 
 type btrdbv4Config struct {
 	addresses []string
@@ -149,7 +153,12 @@ func (bdb *btrdbv4Iface) AddReadings(readings common.Timeseries) error {
 		return errors.Wrap(err, "AddReadings: could not get stream")
 	}
 
+	atomic.AddInt64(&currentWrites, 1)
 	ctx := context.Background()
+	defer func() {
+		atomic.AddInt64(&currentWrites, -1)
+		atomic.AddInt64(&completedWrites, 1)
+	}()
 	timefunc := func(i int) int64 {
 		return readings.Records[i].Time.UnixNano()
 	}
