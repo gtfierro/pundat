@@ -56,6 +56,7 @@ func (s *Stream) initialize(timeseriesStore TimeseriesStore, metadataStore Metad
 		UUID:   currentUUID,
 		SrcURI: msg.URI,
 	}
+
 	s.Unlock()
 
 	// do initialization with the metadata store
@@ -170,7 +171,7 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 			}
 
 			// extract the time
-			timestamp := s.getTime(thing)
+			timestamps := s.getTimes(thing)
 
 			// generate the timeseries values from our extracted value, and then save it
 			// test if the value is a list
@@ -197,7 +198,8 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 						continue
 					}
 					ts.Lock()
-					ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
+					newrec := &common.TimeseriesReading{Time: timestamps[len(ts.Records)], Value: value_f64}
+					ts.Records = append(ts.Records, newrec)
 					ts.Unlock()
 				}
 			} else {
@@ -222,7 +224,7 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 					continue
 				}
 				ts.Lock()
-				ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamp, Value: value_f64})
+				ts.Records = append(ts.Records, &common.TimeseriesReading{Time: timestamps[0], Value: value_f64})
 				ts.Unlock()
 			}
 			//ts.Lock()
@@ -245,6 +247,7 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 
 	defer func() {
 		if r := recover(); r != nil {
+			log.Warningf("%T", r)
 			log.Info("Recovered panic in stream", s.subscribeURI, r)
 			go readPoints()
 		}
@@ -253,11 +256,24 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 	go readPoints()
 }
 
-func (s *Stream) getTime(thing interface{}) time.Time {
+func (s *Stream) getTimes(thing interface{}) (times []time.Time) {
 	if len(s.timeExpr) == 0 {
-		return time.Now()
+		times = append(times, time.Now())
+		return
 	}
 	timeThing := ob.Eval(s.timeExpr, thing)
+
+	if timeList, ok := timeThing.([]interface{}); ok {
+		for _, _timething := range timeList {
+			times = append(times, s.getTime(_timething))
+		}
+	} else {
+		times = append(times, s.getTime(timeThing))
+	}
+	return
+}
+
+func (s *Stream) getTime(timeThing interface{}) time.Time {
 	timeString, ok := timeThing.(string)
 	if ok {
 		parsedTime, err := time.Parse(s.timeParse, timeString)

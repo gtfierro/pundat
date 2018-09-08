@@ -1,5 +1,5 @@
 APP?=pundat
-RELEASE?=0.3.4
+RELEASE?=0.3.5
 COMMIT?=$(shell git rev-parse --short HEAD)
 PROJECT?=github.com/gtfierro/pundat
 PERSISTDIR?=/etc/pundat
