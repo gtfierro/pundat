@@ -155,7 +155,7 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 			//TODO: cannot assume msgpack
 			var thing interface{}
 			msgpackthing, ok := po.(bw2.MsgPackPayloadObject)
-			if !ok {
+			if !ok || msgpackthing == nil {
 				continue
 			}
 			err := msgpackthing.ValueInto(&thing)
