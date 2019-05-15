@@ -126,8 +126,18 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 		}
 	}()
 
+	var readPoints func()
 	// loop through the buffer
-	readPoints := func() {
+	readPoints = func() {
+
+		defer func() {
+			if r := recover(); r != nil {
+				log.Warningf("%T", r)
+				log.Info("Recovered panic in stream", s.subscribeURI, r)
+				go readPoints()
+			}
+		}()
+
 		for msg := range s.buffer {
 			if len(msg.POs) == 0 {
 				continue
@@ -244,14 +254,6 @@ func (s *Stream) start(timeseriesStore TimeseriesStore, metadataStore MetadataSt
 
 		}
 	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			log.Warningf("%T", r)
-			log.Info("Recovered panic in stream", s.subscribeURI, r)
-			go readPoints()
-		}
-	}()
 
 	go readPoints()
 }

@@ -93,7 +93,7 @@ func NewArchiver(c *Config) (a *Archiver) {
 	if a.TS == nil {
 		log.Fatal("could not connect to btrdb")
 	}
-	//a.TS = NewCSVDB()
+	//	a.TS = NewCSVDB()
 
 	// setup bosswave
 	a.bw = bw2.ConnectOrExit(c.BOSSWAVE.Address)

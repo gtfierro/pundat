@@ -1,0 +1,169 @@
+
+state 0
+	$accept: .expression $end 
+
+	LBRACKET  shift 5
+	KEY  shift 4
+	.  error
+
+	array  goto 3
+	object  goto 2
+	expression  goto 1
+
+state 1
+	$accept:  expression.$end 
+
+	$end  accept
+	.  error
+
+
+state 2
+	expression:  object.operatorList 
+	expression:  object.    (3)
+
+	LBRACKET  shift 5
+	DOT  shift 8
+	.  reduce 3 (src line 36)
+
+	array  goto 9
+	operator  goto 7
+	operatorList  goto 6
+
+state 3
+	expression:  array.operatorList 
+	expression:  array.    (4)
+
+	LBRACKET  shift 5
+	DOT  shift 8
+	.  reduce 4 (src line 40)
+
+	array  goto 9
+	operator  goto 7
+	operatorList  goto 10
+
+state 4
+	object:  KEY.    (12)
+
+	.  reduce 12 (src line 83)
+
+
+state 5
+	array:  LBRACKET.NUMBER RBRACKET 
+	array:  LBRACKET.NUMBER COLON NUMBER RBRACKET 
+	array:  LBRACKET.COLON RBRACKET 
+
+	COLON  shift 12
+	NUMBER  shift 11
+	.  error
+
+
+state 6
+	expression:  object operatorList.    (1)
+
+	.  reduce 1 (src line 28)
+
+
+state 7
+	operatorList:  operator.    (5)
+	operatorList:  operator.operatorList 
+
+	LBRACKET  shift 5
+	DOT  shift 8
+	.  reduce 5 (src line 46)
+
+	array  goto 9
+	operator  goto 7
+	operatorList  goto 13
+
+state 8
+	operator:  DOT.object 
+
+	KEY  shift 4
+	.  error
+
+	object  goto 14
+
+state 9
+	operator:  array.    (8)
+
+	.  reduce 8 (src line 60)
+
+
+state 10
+	expression:  array operatorList.    (2)
+
+	.  reduce 2 (src line 32)
+
+
+state 11
+	array:  LBRACKET NUMBER.RBRACKET 
+	array:  LBRACKET NUMBER.COLON NUMBER RBRACKET 
+
+	RBRACKET  shift 15
+	COLON  shift 16
+	.  error
+
+
+state 12
+	array:  LBRACKET COLON.RBRACKET 
+
+	RBRACKET  shift 17
+	.  error
+
+
+state 13
+	operatorList:  operator operatorList.    (6)
+
+	.  reduce 6 (src line 50)
+
+
+state 14
+	operator:  DOT object.    (7)
+
+	.  reduce 7 (src line 56)
+
+
+state 15
+	array:  LBRACKET NUMBER RBRACKET.    (9)
+
+	.  reduce 9 (src line 66)
+
+
+state 16
+	array:  LBRACKET NUMBER COLON.NUMBER RBRACKET 
+
+	NUMBER  shift 18
+	.  error
+
+
+state 17
+	array:  LBRACKET COLON RBRACKET.    (11)
+
+	.  reduce 11 (src line 77)
+
+
+state 18
+	array:  LBRACKET NUMBER COLON NUMBER.RBRACKET 
+
+	RBRACKET  shift 19
+	.  error
+
+
+state 19
+	array:  LBRACKET NUMBER COLON NUMBER RBRACKET.    (10)
+
+	.  reduce 10 (src line 71)
+
+
+9 terminals, 6 nonterminals
+13 grammar rules, 20/2000 states
+0 shift/reduce, 0 reduce/reduce conflicts reported
+55 working sets used
+memory: parser 14/30000
+0 extra closures
+16 shift entries, 1 exceptions
+9 goto entries
+4 entries saved by goto default
+Optimizer space used: output 21/30000
+21 table entries, 0 zero
+maximum spread: 9, maximum offset: 9
